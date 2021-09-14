@@ -35,6 +35,13 @@ go_repository(
     version = "v1.0.0",
 )
 
+go_repository(
+    name = "com_github_google_go_cmp",
+    importpath = "github.com/google/go-cmp",
+    sum = "h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=",
+    version = "v0.5.6",
+)
+
 go_rules_dependencies()
 
 go_register_toolchains(version = "1.17")

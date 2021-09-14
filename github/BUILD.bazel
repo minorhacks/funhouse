@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "github",
+    srcs = ["types.go"],
+    importpath = "github.com/minorhacks/funhouse/github",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "github_test",
+    srcs = ["types_test.go"],
+    embed = [":github"],
+    deps = ["@com_github_google_go_cmp//cmp"],
+)
