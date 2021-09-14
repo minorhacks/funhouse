@@ -24,6 +24,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/hook/print", PrintHandler).Methods("POST")
+  r.HandleFunc("/hook/mirror", MirrorHandler).Methods("POST")
 
 	addr := net.JoinHostPort("", strconv.FormatInt(int64(*httpPort), 10))
 	srv := &http.Server{
@@ -49,4 +50,8 @@ func PrintHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pretty.Print(payload)
+}
+
+func MirrorHandler(w http.ResponseWriter, r *http.Request) {
+  glog.V(1).Infof("%s at path: %s", r.Method, r.URL)
 }
