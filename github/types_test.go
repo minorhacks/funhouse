@@ -147,6 +147,9 @@ func TestUnmarshal(t *testing.T) {
 		Ref:    "refs/tags/simple-tag",
 		Before: "6113728f27ae82c7b1a177c8d03f9e96e0adf246",
 		After:  "0000000000000000000000000000000000000000",
+		Repository: &Repository{
+			URL: "https://github.com/Codertocat/Hello-World",
+		},
 	}
 
 	got := PushPayload{}
