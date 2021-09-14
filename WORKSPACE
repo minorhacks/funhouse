@@ -42,6 +42,13 @@ go_repository(
     version = "v0.5.6",
 )
 
+go_repository(
+    name = "com_github_kylelemons_godebug",
+    importpath = "github.com/kylelemons/godebug",
+    sum = "h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=",
+    version = "v1.1.0",
+)
+
 go_rules_dependencies()
 
 go_register_toolchains(version = "1.17")
