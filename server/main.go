@@ -17,6 +17,7 @@ import (
 	"github.com/minorhacks/funhouse/github"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	"github.com/kylelemons/godebug/pretty"
@@ -83,6 +84,20 @@ func (r *Repo) init(url string) error {
 	return nil
 }
 
+func (r *Repo) pull(ref string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	err := r.repo.Fetch(&git.FetchOptions{
+		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+%s:%s", ref, ref))},
+		Force:    true,
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return fmt.Errorf("failed to pull ref %q for repo %q: %v", ref, r.path, err)
+	}
+	return nil
+}
+
 func (s *Service) PrintHandler(w http.ResponseWriter, r *http.Request) {
 	glog.V(1).Infof("%s at path: %s", r.Method, r.URL)
 
@@ -123,8 +138,12 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// With directory locked
-	// Pull new refs
+	err = repo.pull(payload.Ref)
+	if err != nil {
+		glog.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func storePath(urlStr string) string {
