@@ -53,7 +53,34 @@ type Service struct {
 type Repo struct {
 	mu   sync.RWMutex
 	path string
-  repo *git.Repository
+	repo *git.Repository
+}
+
+func (r *Repo) init(url string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.repo == nil {
+		var gitRepo *git.Repository
+		var err error
+		if _, statErr := os.Stat(r.path); os.IsNotExist(statErr) {
+			gitRepo, err = git.PlainCloneContext(context.TODO(), r.path /* isBare */, true, &git.CloneOptions{
+				URL: url,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to clone: %v", err)
+			}
+			glog.Infof("Successfully cloned %q to %q", url, r.path)
+		} else {
+			gitRepo, err = git.PlainOpen(r.path)
+			if err != nil {
+				return fmt.Errorf("failed to open existing git repo: %v", err)
+			}
+			glog.Infof("Successfully opened repo at %q", r.path)
+		}
+		r.repo = gitRepo
+	}
+	return nil
 }
 
 func (s *Service) PrintHandler(w http.ResponseWriter, r *http.Request) {
@@ -88,31 +115,12 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 	repo := val.(*Repo)
 	// If not present, create and initialize it
 	if !present {
-		repo.mu.Lock()
-		defer repo.mu.Unlock()
-
-		var gitRepo *git.Repository
-		if _, statErr := os.Stat(repo.path); os.IsNotExist(statErr) {
-			gitRepo, err = git.PlainCloneContext(context.TODO(), repo.path /* isBare */, true, &git.CloneOptions{
-				URL: payload.Repository.URL,
-			})
-			if err != nil {
-				glog.Errorf("Failed to clone: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			glog.Infof("Successfully cloned %q to %q", payload.Repository.URL, repo.path)
-		} else {
-			gitRepo, err = git.PlainOpen(repo.path)
-			if err != nil {
-				glog.Error("Failed to open git repo: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			glog.Infof("Successfully opened repo at %q", repo.path)
+		err := repo.init(payload.Repository.URL)
+		if err != nil {
+			glog.Error(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-
-    repo.repo = gitRepo
 	}
 
 	// With directory locked
