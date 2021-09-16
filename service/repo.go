@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"os"
+	"path/filepath"
+	"sync"
 
 	git "github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
@@ -15,6 +16,10 @@ type Repo struct {
 	mu   sync.RWMutex
 	path string
 	repo *git.Repository
+}
+
+func (r *Repo) fullPath(base string) string {
+	return filepath.Join(base, r.path)
 }
 
 func (r *Repo) init(url string) error {

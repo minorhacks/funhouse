@@ -2,7 +2,7 @@ package service
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -10,13 +10,14 @@ import (
 
 	"github.com/minorhacks/funhouse/github"
 
+	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	"github.com/golang/glog"
 	"github.com/kylelemons/godebug/pretty"
 )
 
 type Service struct {
 	BasePath string
-	repoMap sync.Map
+	repoMap  sync.Map
 }
 
 func (s *Service) PrintHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,9 +46,9 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
+	relPath := storePath(payload.Repository.URL)
 	// Get directory for repository
-	val, present := s.repoMap.LoadOrStore(payload.Repository.URL, &Repo{path: filepath.Join(s.BasePath, storePath(payload.Repository.URL))})
+	val, present := s.repoMap.LoadOrStore(relPath, &Repo{path: relPath})
 	repo := val.(*Repo)
 	// If not present, create and initialize it
 	if !present {
@@ -68,10 +69,50 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) CatHandler(w http.ResponseWriter, r *http.Request) {
+	req := CatFileRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
+	val, ok := s.repoMap.Load(req.Repo)
+	if !ok {
+		glog.Errorf("%s: repo %q not found", r.URL, req.Repo)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	repo := val.(*Repo)
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
+	if err != nil {
+		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	f, err := commit.File(req.Path)
+	if err != nil {
+		glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	rdr, err := f.Blob.Reader()
+	if err != nil {
+		glog.Errorf("%s: can't get reader for file %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer rdr.Close()
+
+	_, err = io.Copy(w, rdr)
+	if err != nil {
+		glog.Errorf("%s: error copying %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func storePath(urlStr string) string {
 	parsed, _ := url.Parse(urlStr) // TODO: catch error
-	return fmt.Sprintf("%s/%s", parsed.Host, parsed.Path)
+	return filepath.Join(parsed.Host, parsed.Path)
 }
