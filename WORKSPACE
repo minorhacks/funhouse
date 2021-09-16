@@ -406,6 +406,13 @@ container_deps()
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
+    name = "alpine",
+    digest = "sha256:69704ef328d05a9f806b6b8502915e6a0a4faa4d72018dc42343f511490daf8a",
+    registry = "docker.io",
+    repository = "library/alpine",
+)
+
+container_pull(
     name = "distroless_base",
     digest = "sha256:e37cf3289c1332c5123cbf419a1657c8dad0811f2f8572433b668e13747718f8",
     registry = "gcr.io",
