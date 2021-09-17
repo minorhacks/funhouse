@@ -31,7 +31,8 @@ func (r *Repo) init(url string) error {
 		var gitRepo *git.Repository
 		var err error
 		if _, statErr := os.Stat(r.path); os.IsNotExist(statErr) {
-			gitRepo, err = git.PlainCloneContext(context.TODO(), r.fullPath(),/* isBare */ true, &git.CloneOptions{
+			glog.Infof("Cloning repo %s...", url)
+			gitRepo, err = git.PlainCloneContext(context.TODO(), r.fullPath(), true /* isBare */, &git.CloneOptions{
 				URL: url,
 			})
 			if err != nil {

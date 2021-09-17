@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,6 +19,29 @@ import (
 type Service struct {
 	BasePath string
 	repoMap  sync.Map
+	singleRepo *Repo
+}
+
+func NewSingle(basePath string, repoURL string) (*Service, error) {
+	r := &Repo{
+		root: basePath,
+		path: "",
+	}
+	err := r.init(repoURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init repo: %v", err)
+	}
+	s := &Service{
+		BasePath: basePath,
+		singleRepo: r,
+	}
+	return s, nil
+}
+
+func NewMulti(basePath string) (*Service, error) {
+	return &Service{
+		BasePath: basePath,
+	}, nil
 }
 
 func (s *Service) PrintHandler(w http.ResponseWriter, r *http.Request) {
