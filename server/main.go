@@ -44,6 +44,7 @@ func app() error {
 	r := mux.NewRouter()
 	r.HandleFunc("/hook/print", s.PrintHandler).Methods("POST")
 	r.HandleFunc("/cat", s.CatHandler).Methods("GET")
+	r.HandleFunc("/getattr", s.GetAttrHandler).Methods("GET")
 	if *singleRepo == "" {
 		r.HandleFunc("/hook/mirror", s.MirrorHandler).Methods("POST")
 	}

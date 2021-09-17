@@ -7,18 +7,21 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/minorhacks/funhouse/github"
 
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
+	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
+	gitobject "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/golang/glog"
 	"github.com/kylelemons/godebug/pretty"
 )
 
 type Service struct {
-	BasePath string
-	repoMap  sync.Map
+	BasePath   string
+	repoMap    sync.Map
 	singleRepo *Repo
 }
 
@@ -32,7 +35,7 @@ func NewSingle(basePath string, repoURL string) (*Service, error) {
 		return nil, fmt.Errorf("failed to init repo: %v", err)
 	}
 	s := &Service{
-		BasePath: basePath,
+		BasePath:   basePath,
 		singleRepo: r,
 	}
 	return s, nil
@@ -101,13 +104,12 @@ func (s *Service) CatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	val, ok := s.repoMap.Load(req.Repo)
-	if !ok {
-		glog.Errorf("%s: repo %q not found", r.URL, req.Repo)
+	repo, err := s.getRepo(req.Repo)
+	if err != nil {
+		glog.Errorf("%s: %v", err)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	repo := val.(*Repo)
 	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
 	if err != nil {
 		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
@@ -134,6 +136,93 @@ func (s *Service) CatHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Service) GetAttrHandler(w http.ResponseWriter, r *http.Request) {
+	req := GetAttrRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	path := strings.TrimLeft(req.Path, "/")
+
+	repo, err := s.getRepo(req.Repo)
+	if err != nil {
+		glog.Errorf("%s: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
+	if err != nil {
+		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	var f *gitobject.File
+	if path == "" {
+		// go-git doesn't have any concept of a "root directory" apparently, so
+		// this is a hack to simulate it.
+		f = &gitobject.File{
+			Mode: gitfilemode.Dir,
+		}
+	} else {
+		f, err = commit.File(path)
+		if err != nil {
+			glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}
+
+	res := &GetAttrResponse{}
+	res.AuthorTime = JSONTime{commit.Author.When}
+	res.CommitTime = JSONTime{commit.Committer.When}
+	res.Size = uint64(f.Blob.Size)
+	switch f.Mode {
+	case gitfilemode.Empty:
+		res.FileMode = FileModeEmpty
+	case gitfilemode.Dir:
+		res.FileMode = FileModeDir
+	case gitfilemode.Regular:
+		res.FileMode = FileModeRegular
+	case gitfilemode.Deprecated:
+		res.FileMode = FileModeRegular
+	case gitfilemode.Executable:
+		res.FileMode = FileModeExecutable
+	case gitfilemode.Symlink:
+		res.FileMode = FileModeSymlink
+	case gitfilemode.Submodule:
+		res.FileMode = FileModeSubmodule
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&res)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Service) getRepo(repo string) (*Repo, error) {
+	if s.singleRepo != nil && repo != "" {
+		return nil, fmt.Errorf("repo name must be unspecified for single-repo mode")
+	}
+	if s.singleRepo == nil && repo == "" {
+		return nil, fmt.Errorf("repo name must be specified for multi-repo mode")
+	}
+	if s.singleRepo != nil {
+		return s.singleRepo, nil
+	}
+	val, ok := s.repoMap.Load(repo)
+	if !ok {
+		return nil, fmt.Errorf("repo %q not found", repo)
+	}
+	return val.(*Repo), nil
 }
 
 func storePath(urlStr string) string {

@@ -30,7 +30,7 @@ func (r *Repo) init(url string) error {
 	if r.repo == nil {
 		var gitRepo *git.Repository
 		var err error
-		if _, statErr := os.Stat(r.path); os.IsNotExist(statErr) {
+		if _, statErr := os.Stat(r.fullPath()); os.IsNotExist(statErr) {
 			glog.Infof("Cloning repo %s...", url)
 			gitRepo, err = git.PlainCloneContext(context.TODO(), r.fullPath(), true /* isBare */, &git.CloneOptions{
 				URL: url,
@@ -40,7 +40,7 @@ func (r *Repo) init(url string) error {
 			}
 			glog.Infof("Successfully cloned %q to %q", url, r.path)
 		} else {
-			gitRepo, err = git.PlainOpen(r.path)
+			gitRepo, err = git.PlainOpen(r.fullPath())
 			if err != nil {
 				return fmt.Errorf("failed to open existing git repo: %v", err)
 			}
