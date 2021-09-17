@@ -21,7 +21,7 @@ func (f *GitFS) SetDebug(debug bool) {
 
 func (f *GitFS) GetAttr(name string, context *gofuse.Context) (*gofuse.Attr, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("GetAttr() called")
+	glog.V(1).Infof("GetAttr(name=%q) called", name)
 	return nil, gofuse.ENOENT
 }
 
@@ -43,7 +43,7 @@ func (f *GitFS) Truncate(name string, size uint64, context *gofuse.Context) gofu
 
 func (f *GitFS) Access(name string, mode uint32, context *gofuse.Context) gofuse.Status {
 	// TODO: Implement
-	glog.V(1).Infof("Access() called")
+	glog.V(1).Infof("Access(name=%q, mode=%#o) called", name, mode)
 	return gofuse.ENOENT
 }
 
@@ -73,13 +73,13 @@ func (f *GitFS) Unlink(name string, context *gofuse.Context) gofuse.Status {
 
 func (f *GitFS) GetXAttr(name string, attribute string, context *gofuse.Context) ([]byte, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("GetXAttr() called")
+	glog.V(1).Infof("GetXAttr(name=%q, attribute=%q) called", name, attribute)
 	return nil, gofuse.ENOENT
 }
 
 func (f *GitFS) ListXAttr(name string, context *gofuse.Context) ([]string, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("ListXAttr() called")
+	glog.V(1).Infof("ListXAttr(name=%q) called", name)
 	return nil, gofuse.ENOENT
 }
 
@@ -101,7 +101,7 @@ func (f *GitFS) OnUnmount() {
 
 func (f *GitFS) Open(name string, flags uint32, context *gofuse.Context) (nodefs.File, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("Open() called")
+	glog.V(1).Infof("Open(name=%q, flags=%#x) called", name, flags)
 	return nil, gofuse.ENOENT
 }
 
@@ -111,7 +111,7 @@ func (f *GitFS) Create(name string, flags uint32, mode uint32, context *gofuse.C
 
 func (f *GitFS) OpenDir(name string, context *gofuse.Context) ([]gofuse.DirEntry, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("OpenDir() called")
+	glog.V(1).Infof("OpenDir(name=%q) called", name)
 	return nil, gofuse.ENOENT
 }
 
@@ -121,12 +121,12 @@ func (f *GitFS) Symlink(value string, linkName string, context *gofuse.Context) 
 
 func (f *GitFS) Readlink(name string, context *gofuse.Context) (string, gofuse.Status) {
 	// TODO: implement
-	glog.V(1).Infof("Readlink() called")
+	glog.V(1).Infof("Readlink(name=%q) called", name)
 	return "", gofuse.ENOENT
 }
 
 func (f *GitFS) StatFs(name string) *gofuse.StatfsOut {
 	// TODO: implement
-	glog.V(1).Infof("StatFs() called")
+	glog.V(1).Infof("StatFs(name=%q) called", name)
 	return &gofuse.StatfsOut{}
 }
