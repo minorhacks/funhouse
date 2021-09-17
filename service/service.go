@@ -15,6 +15,7 @@ import (
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
 	gitobject "github.com/go-git/go-git/v5/plumbing/object"
+	git "github.com/go-git/go-git/v5"
 	"github.com/golang/glog"
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -198,6 +199,47 @@ func (s *Service) GetAttrHandler(w http.ResponseWriter, r *http.Request) {
 		res.FileMode = FileModeSymlink
 	case gitfilemode.Submodule:
 		res.FileMode = FileModeSubmodule
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&res)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Service) CommitsHandler(w http.ResponseWriter, r *http.Request) {
+	req := ListCommitsRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	repo, err := s.getRepo(req.Repo)
+	if err != nil {
+		glog.Errorf("%s: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	res := &ListCommitsResponse{}
+	iter, err := repo.repo.Log(&git.LogOptions{})
+	if err != nil {
+		glog.Errorf("%s: failed to get commit iterator: %v", r.URL, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = iter.ForEach(func (c *gitobject.Commit) error {
+		res.CommitHashes = append(res.CommitHashes, c.Hash.String())
+		return nil
+	})
+	if err != nil {
+		glog.Errorf("%s: error while traversing commits: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

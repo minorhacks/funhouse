@@ -49,3 +49,11 @@ type GetAttrResponse struct {
 	CommitTime JSONTime `json:"commit_time"`
 	AuthorTime JSONTime `json:"author_time"`
 }
+
+type ListCommitsRequest struct {
+	Repo string `json:"repo"`
+}
+
+type ListCommitsResponse struct {
+	CommitHashes []string `json:"commit_hashes"`
+}
