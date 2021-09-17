@@ -48,7 +48,7 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	relPath := storePath(payload.Repository.URL)
 	// Get directory for repository
-	val, present := s.repoMap.LoadOrStore(relPath, &Repo{path: relPath})
+	val, present := s.repoMap.LoadOrStore(relPath, &Repo{root: s.BasePath, path: relPath})
 	repo := val.(*Repo)
 	// If not present, create and initialize it
 	if !present {

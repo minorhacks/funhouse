@@ -375,6 +375,13 @@ go_repository(
     version = "v0.0.0-20200804184101-5ec99f83aff1",
 )
 
+go_repository(
+    name = "com_github_hanwen_go_fuse",
+    importpath = "github.com/hanwen/go-fuse",
+    sum = "h1:GxS9Zrn6c35/BnfiVsZVWmsG803xwE7eVRDvcf/BEVc=",
+    version = "v1.0.0",
+)
+
 go_rules_dependencies()
 
 go_register_toolchains(version = "1.17")

@@ -14,12 +14,13 @@ import (
 
 type Repo struct {
 	mu   sync.RWMutex
+	root string
 	path string
 	repo *git.Repository
 }
 
-func (r *Repo) fullPath(base string) string {
-	return filepath.Join(base, r.path)
+func (r *Repo) fullPath() string {
+	return filepath.Join(r.root, r.path)
 }
 
 func (r *Repo) init(url string) error {
@@ -30,7 +31,7 @@ func (r *Repo) init(url string) error {
 		var gitRepo *git.Repository
 		var err error
 		if _, statErr := os.Stat(r.path); os.IsNotExist(statErr) {
-			gitRepo, err = git.PlainCloneContext(context.TODO(), r.path /* isBare */, true, &git.CloneOptions{
+			gitRepo, err = git.PlainCloneContext(context.TODO(), r.fullPath(),/* isBare */ true, &git.CloneOptions{
 				URL: url,
 			})
 			if err != nil {

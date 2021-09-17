@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "fuse",
+    srcs = ["fs.go"],
+    importpath = "github.com/minorhacks/funhouse/fuse",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_golang_glog//:glog",
+        "@com_github_hanwen_go_fuse//fuse",
+        "@com_github_hanwen_go_fuse//fuse/nodefs",
+        "@com_github_hanwen_go_fuse//fuse/pathfs",
+    ],
+)
