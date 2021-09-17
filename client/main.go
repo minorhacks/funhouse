@@ -17,6 +17,7 @@ import (
 
 var (
 	mountPoint = flag.String("mount_point", "", "Location where filesystem should be mounted")
+	serverAddr = flag.String("server_addr", "", "Address of API server")
 
 	entryTTL    = flag.Float64("entry_ttl", 1.0, "FUSE entry cache TTL")
 	negativeTTL = flag.Float64("negative_ttl", 1.0, "FUSE negative entry cache TTL")
@@ -32,7 +33,9 @@ func main() {
 }
 
 func app() error {
-	fs := &fuse.GitFS{}
+	fs := &fuse.GitFS{
+		ServerAddr: *serverAddr,
+	}
 	pathNodeFs := pathfs.NewPathNodeFs(fs, &pathfs.PathNodeFsOptions{})
 	mountState, _, err := nodefs.MountRoot(*mountPoint, pathNodeFs.Root(), &nodefs.Options{
 		EntryTimeout:    time.Duration(*entryTTL * float64(time.Second)),

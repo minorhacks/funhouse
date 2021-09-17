@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/minorhacks/funhouse/fuse",
     visibility = ["//visibility:public"],
     deps = [
+        "//service",
         "@com_github_golang_glog//:glog",
         "@com_github_hanwen_go_fuse//fuse",
         "@com_github_hanwen_go_fuse//fuse/nodefs",

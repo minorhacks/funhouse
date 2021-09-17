@@ -1,8 +1,16 @@
 package fuse
 
 import (
+	"bytes"
+	"strings"
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"os"
 	"syscall"
 	"time"
+
+	"github.com/minorhacks/funhouse/service"
 
 	"github.com/golang/glog"
 	gofuse "github.com/hanwen/go-fuse/fuse"
@@ -10,7 +18,9 @@ import (
 	"github.com/hanwen/go-fuse/fuse/pathfs"
 )
 
-type GitFS struct {}
+type GitFS struct {
+	ServerAddr string
+}
 
 func (f *GitFS) String() string {
 	return "GitFS"
@@ -28,13 +38,18 @@ func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr,
 		}
 	}()
 
+	path := strings.FieldsFunc(name, func(c rune) bool { return c == os.PathSeparator })
 	// Simulate top-level dirs
-	switch name {
-	case "":
+	switch {
+	case len(path) == 0:
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
-	case "commits":
+	case len(path) == 1 && path[0] == "commits":
+		return &gofuse.Attr{
+			Mode: syscall.S_IFDIR,
+		}, gofuse.OK
+	case len(path) == 2 && path[0] == "commits":
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
@@ -106,7 +121,6 @@ func (f *GitFS) GetXAttr(name string, attribute string, context *gofuse.Context)
 }
 
 func (f *GitFS) ListXAttr(name string, context *gofuse.Context) (xattrs []string, status gofuse.Status) {
-	// TODO: implement
 	glog.V(1).Infof("ListXAttr(name=%q) called", name)
 	defer func() {
 		if status != gofuse.OK {
@@ -166,6 +180,38 @@ func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.Dir
 				Mode: syscall.S_IFDIR,
 			},
 		}, gofuse.OK
+	case "commits":
+		client := &http.Client{}
+		r := &service.ListCommitsRequest{}
+		body, err := json.Marshal(r)
+		if err != nil {
+			glog.Errorf("failed to marshal ListCommitsRequest: %v", err)
+			return nil, gofuse.EIO
+		}
+		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "commits"}).String(), bytes.NewReader(body))
+		if err != nil {
+			glog.Errorf("failed to get commit list: %v", err)
+			return nil, gofuse.EIO
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			glog.Errorf("failed to get commit list: %v", err)
+			return nil, gofuse.EIO
+		}
+		defer res.Body.Close()
+		var resData service.ListCommitsResponse
+		err = json.NewDecoder(res.Body).Decode(&resData)
+		if err != nil {
+			glog.Errorf("failed to parse commit list response: %v", err)
+			return nil, gofuse.EIO
+		}
+		for _, hash := range resData.CommitHashes {
+			dirs = append(dirs, gofuse.DirEntry{
+				Name: hash,
+				Mode: syscall.S_IFDIR,
+			})
+		}
+		return dirs, gofuse.OK
 	}
 
 	return nil, gofuse.ENOENT
