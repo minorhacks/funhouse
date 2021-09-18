@@ -50,8 +50,50 @@ func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr,
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
 	case len(path) == 2 && path[0] == "commits":
+		// Assuming each subdir here is a commit hash
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
+		}, gofuse.OK
+	case len(path) >= 2 && path[0] == "commits":
+		// Assume path[1] is the commit hash
+		client := &http.Client{}
+		var filePath string
+		if len(path) == 2 {
+			filePath = "/"
+		} else {
+			filePath = "/" + strings.Join(path[2:], "/")
+		}
+		r := &service.GetAttrRequest{
+			CommitHash: path[1],
+			Path: filePath,
+		}
+
+		body, err := json.Marshal(r)
+		if err != nil {
+			glog.Errorf("failed to marshal GetAttrRequest: %v", err)
+			return nil, gofuse.EIO
+		}
+
+		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "getattr"}).String(), bytes.NewReader(body))
+		if err != nil {
+			glog.Errorf("failed to get attrs for %q: %v", filePath, err)
+			return nil, gofuse.EIO
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			glog.Errorf("failed to get attrs for %q: %v", filePath, err)
+			return nil, gofuse.EIO
+		}
+		defer res.Body.Close()
+		var resData service.GetAttrResponse
+		err = json.NewDecoder(res.Body).Decode(&resData)
+		if err != nil {
+			glog.Errorf("failed to parse attr response: %v", err)
+			return nil, gofuse.EIO
+		}
+		return &gofuse.Attr{
+			Mode: uint32(resData.FileMode.ToSyscallMode()),
+			Size: resData.Size,
 		}, gofuse.OK
 	}
 	return nil, gofuse.ENOENT
@@ -171,16 +213,17 @@ func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.Dir
 		}
 	}()
 
+	path := strings.FieldsFunc(name, func(c rune) bool { return c == os.PathSeparator })
 	// Simulate top-level dirs
-	switch name {
-	case "":
+	switch {
+	case len(path) == 0:
 		return []gofuse.DirEntry{
 			{
 				Name: "commits",
 				Mode: syscall.S_IFDIR,
 			},
 		}, gofuse.OK
-	case "commits":
+	case len(path) == 1 && path[0] == "commits":
 		client := &http.Client{}
 		r := &service.ListCommitsRequest{}
 		body, err := json.Marshal(r)
@@ -209,6 +252,50 @@ func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.Dir
 			dirs = append(dirs, gofuse.DirEntry{
 				Name: hash,
 				Mode: syscall.S_IFDIR,
+			})
+		}
+		return dirs, gofuse.OK
+	case len(path) >= 2 && path[0] == "commits":
+		// Assume path[1] is the commit hash
+		client := &http.Client{}
+		var filePath string
+		if len(path) == 2 {
+			filePath = "/"
+		} else {
+			filePath = "/" + strings.Join(path[2:], "/")
+		}
+		r := &service.ListDirRequest{
+			CommitHash: path[1],
+			Path: filePath,
+		}
+
+		body, err := json.Marshal(r)
+		if err != nil {
+			glog.Errorf("failed to marshal ListCommitsRequest: %v", err)
+			return nil, gofuse.EIO
+		}
+
+		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "listdir"}).String(), bytes.NewReader(body))
+		if err != nil {
+			glog.Errorf("failed to get dir entry list: %v", err)
+			return nil, gofuse.EIO
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			glog.Errorf("failed to get dir entry list: %v", err)
+			return nil, gofuse.EIO
+		}
+		defer res.Body.Close()
+		var resData service.ListDirResponse
+		err = json.NewDecoder(res.Body).Decode(&resData)
+		if err != nil {
+			glog.Errorf("failed to parse dir entry list response: %v", err)
+			return nil, gofuse.EIO
+		}
+		for _, entry := range resData.Entries {
+			dirs = append(dirs, gofuse.DirEntry{
+				Name: entry.Name,
+				Mode: uint32(entry.FileMode.ToSyscallMode()),
 			})
 		}
 		return dirs, gofuse.OK

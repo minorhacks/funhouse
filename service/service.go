@@ -12,10 +12,9 @@ import (
 
 	"github.com/minorhacks/funhouse/github"
 
-	gitplumbing "github.com/go-git/go-git/v5/plumbing"
-	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
-	gitobject "github.com/go-git/go-git/v5/plumbing/object"
 	git "github.com/go-git/go-git/v5"
+	gitplumbing "github.com/go-git/go-git/v5/plumbing"
+	gitobject "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/golang/glog"
 	"github.com/kylelemons/godebug/pretty"
 )
@@ -164,27 +163,38 @@ func (s *Service) GetAttrHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var f *gitobject.File
-	if path == "" {
-		// go-git doesn't have any concept of a "root directory" apparently, so
-		// this is a hack to simulate it.
-		f = &gitobject.File{
-			Mode: gitfilemode.Dir,
-		}
-	} else {
-		f, err = commit.File(path)
-		if err != nil {
-			glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
+	rootTree, err := commit.Tree()
+	if err != nil {
+		glog.Errorf("%s: can't get tree for commit %q: %v", r.URL, req.CommitHash, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	res := &GetAttrResponse{}
 	res.AuthorTime = JSONTime{commit.Author.When}
 	res.CommitTime = JSONTime{commit.Committer.When}
-	res.Size = uint64(f.Blob.Size)
-	res.FileMode = FromGitFileMode(f.Mode)
+	if path == "" {
+		// go-git doesn't have any concept of a "root directory" apparently, so
+		// this is a hack to simulate it.
+		res.FileMode = FileModeDir
+	} else {
+		entry, err := rootTree.FindEntry(path)
+		if err != nil {
+			glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		res.FileMode = FromGitFileMode(entry.Mode)
+		if entry.Mode.IsFile() {
+			entryFile, err := rootTree.TreeEntryFile(entry)
+			if err != nil {
+				glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			res.Size = uint64(entryFile.Blob.Size)
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&res)
@@ -217,7 +227,7 @@ func (s *Service) CommitsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = iter.ForEach(func (c *gitobject.Commit) error {
+	err = iter.ForEach(func(c *gitobject.Commit) error {
 		res.CommitHashes = append(res.CommitHashes, c.Hash.String())
 		return nil
 	})
@@ -244,6 +254,9 @@ func (s *Service) ListDirHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Ensure the string is properly suffixed for a directory
+	if !strings.HasPrefix(req.Path, "/") {
+		req.Path = "/" + req.Path
+	}
 	if !strings.HasSuffix(req.Path, "/") {
 		req.Path = req.Path + "/"
 	}
@@ -264,32 +277,34 @@ func (s *Service) ListDirHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, err := commit.Files()
+	tree, err := commit.Tree()
 	if err != nil {
-		glog.Errorf("%s: can't get files for commit %q: %v", r.URL, req.CommitHash, err)
+		glog.Errorf("%s: can't get tree for commit %q: %v", r.URL, req.CommitHash, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	err = files.ForEach(func (f *gitobject.File) error {
+	treeIter := gitobject.NewTreeWalker(tree, true /* recursive */, nil)
+	defer treeIter.Close()
+
+	var name string
+	var treeEntry gitobject.TreeEntry
+	for name, treeEntry, err = treeIter.Next(); err == nil; name, treeEntry, err = treeIter.Next() {
+		name = "/" + name
 		// Filter out all files not direct descendants of the specified dir
-		if !strings.HasPrefix(f.Name, req.Path) {
-			return nil
+		if !strings.HasPrefix(name, req.Path) {
+			continue
 		}
-		delta := strings.TrimPrefix(f.Name, req.Path)
+		delta := strings.TrimPrefix(name, req.Path)
 		if strings.Contains(delta, "/") {
-			return nil
+			continue
 		}
 		// Return an entry for the remaining entries
 		res.Entries = append(res.Entries, &DirEntry{
-			Name: f.Name,
-			FileMode: FromGitFileMode(f.Mode),
-			Size: uint64(f.Size),
-			CommitTime: JSONTime{commit.Committer.When},
-			AuthorTime: JSONTime{commit.Author.When},
+			Name:     delta,
+			FileMode: FromGitFileMode(treeEntry.Mode),
 		})
-		return nil
-	})
-	if err != nil {
+	}
+	if err != nil && err != io.EOF {
 		glog.Errorf("%s: error while iterating through files for commit %q: %v", r.URL, req.CommitHash, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return

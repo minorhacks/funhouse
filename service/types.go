@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"syscall"
 	"time"
 
 	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
@@ -35,6 +36,21 @@ func FromGitFileMode(m gitfilemode.FileMode) FileMode {
 		return FileModeSymlink
 	case gitfilemode.Submodule:
 		return FileModeSubmodule
+	default:
+		panic(fmt.Sprintf("Unhandled filemode: %v", m))
+	}
+}
+
+func (m FileMode) ToSyscallMode() int {
+	switch m {
+	case FileModeDir:
+		return syscall.S_IFDIR
+	case FileModeRegular:
+		return syscall.S_IFREG
+	case FileModeExecutable:
+		return syscall.S_IFREG
+	case FileModeSymlink:
+		return syscall.S_IFLNK
 	default:
 		panic(fmt.Sprintf("Unhandled filemode: %v", m))
 	}
@@ -94,7 +110,4 @@ type ListDirResponse struct {
 type DirEntry struct {
 	Name       string   `json:"name"`
 	FileMode   FileMode `json:"file_mode"`
-	Size       uint64   `json:"size"`
-	CommitTime JSONTime `json:"commit_time"`
-	AuthorTime JSONTime `json:"author_time"`
 }
