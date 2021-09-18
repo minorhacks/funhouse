@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package funhouse.git_read_fs;
+
+service GitReadFs {
+  rpc GetFile(GetFileRequest) returns (GetFileResponse) {}
+  rpc GetAttributes(GetAttributesRequest) returns (GetAttributesResponse) {}
+  rpc ListCommits(ListCommitsRequest) returns (ListCommitsResponse) {}
+  rpc ListDir(ListDirRequest) returns (ListDirResponse) {}
+}
+
+enum FileMode {
+  MODE_UNKNOWN = 0;
+  MODE_EMPTY = 1;
+  MODE_DIR = 2;
+  MODE_REGULAR = 3;
+  MODE_EXECUTABLE = 4;
+  MODE_SYMLINK = 5;
+  MODE_SUBMODULE = 6;
+}
+
+message GetFileRequest {
+  string commit = 1; // required
+  string path = 2;   // required
+}
+
+message GetFileResponse { bytes contents = 1; }
+
+message GetAttributesRequest {
+  string commit = 1; // required
+  string path = 2;   // required
+}
+
+message GetAttributesResponse {
+  FileMode mode = 1;
+  uint64 size_bytes = 2;
+  google.protobuf.Timestamp commit_time = 3;
+  google.protobuf.Timestamp author_time = 4;
+}
+
+message ListCommitsRequest {}
+
+message ListCommitsResponse { repeated string commits = 1; }
+
+message ListDirRequest {
+  string commit = 1; // required
+  string path = 2;   // required
+}
+
+message ListDirResponse { repeated DirEntry entries = 1; }
+
+message DirEntry {
+  string name = 1;
+  FileMode mode = 2;
+}
