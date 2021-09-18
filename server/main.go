@@ -46,6 +46,7 @@ func app() error {
 	r.HandleFunc("/cat", s.CatHandler).Methods("GET")
 	r.HandleFunc("/getattr", s.GetAttrHandler).Methods("GET")
 	r.HandleFunc("/commits", s.CommitsHandler).Methods("GET")
+	r.HandleFunc("/listdir", s.ListDirHandler).Methods("GET")
 	if *singleRepo == "" {
 		r.HandleFunc("/hook/mirror", s.MirrorHandler).Methods("POST")
 	}

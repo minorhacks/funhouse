@@ -184,22 +184,7 @@ func (s *Service) GetAttrHandler(w http.ResponseWriter, r *http.Request) {
 	res.AuthorTime = JSONTime{commit.Author.When}
 	res.CommitTime = JSONTime{commit.Committer.When}
 	res.Size = uint64(f.Blob.Size)
-	switch f.Mode {
-	case gitfilemode.Empty:
-		res.FileMode = FileModeEmpty
-	case gitfilemode.Dir:
-		res.FileMode = FileModeDir
-	case gitfilemode.Regular:
-		res.FileMode = FileModeRegular
-	case gitfilemode.Deprecated:
-		res.FileMode = FileModeRegular
-	case gitfilemode.Executable:
-		res.FileMode = FileModeExecutable
-	case gitfilemode.Symlink:
-		res.FileMode = FileModeSymlink
-	case gitfilemode.Submodule:
-		res.FileMode = FileModeSubmodule
-	}
+	res.FileMode = FromGitFileMode(f.Mode)
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(&res)
@@ -238,6 +223,74 @@ func (s *Service) CommitsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		glog.Errorf("%s: error while traversing commits: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(&res)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Service) ListDirHandler(w http.ResponseWriter, r *http.Request) {
+	req := ListDirRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	// Ensure the string is properly suffixed for a directory
+	if !strings.HasSuffix(req.Path, "/") {
+		req.Path = req.Path + "/"
+	}
+
+	repo, err := s.getRepo(req.Repo)
+	if err != nil {
+		glog.Errorf("%s: %v", err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	res := &ListDirResponse{}
+
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
+	if err != nil {
+		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	files, err := commit.Files()
+	if err != nil {
+		glog.Errorf("%s: can't get files for commit %q: %v", r.URL, req.CommitHash, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = files.ForEach(func (f *gitobject.File) error {
+		// Filter out all files not direct descendants of the specified dir
+		if !strings.HasPrefix(f.Name, req.Path) {
+			return nil
+		}
+		delta := strings.TrimPrefix(f.Name, req.Path)
+		if strings.Contains(delta, "/") {
+			return nil
+		}
+		// Return an entry for the remaining entries
+		res.Entries = append(res.Entries, &DirEntry{
+			Name: f.Name,
+			FileMode: FromGitFileMode(f.Mode),
+			Size: uint64(f.Size),
+			CommitTime: JSONTime{commit.Committer.When},
+			AuthorTime: JSONTime{commit.Author.When},
+		})
+		return nil
+	})
+	if err != nil {
+		glog.Errorf("%s: error while iterating through files for commit %q: %v", r.URL, req.CommitHash, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
