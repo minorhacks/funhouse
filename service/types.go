@@ -41,16 +41,16 @@ func FromGitFileMode(m gitfilemode.FileMode) FileMode {
 	}
 }
 
-func (m FileMode) ToSyscallMode() int {
+func (m FileMode) ToSyscallMode() uint32 {
 	switch m {
 	case FileModeDir:
-		return syscall.S_IFDIR
+		return syscall.S_IFDIR | 0o555
 	case FileModeRegular:
-		return syscall.S_IFREG
+		return syscall.S_IFREG | 0o444
 	case FileModeExecutable:
-		return syscall.S_IFREG
+		return syscall.S_IFREG | 0o555
 	case FileModeSymlink:
-		return syscall.S_IFLNK
+		return syscall.S_IFLNK | 0o555
 	default:
 		panic(fmt.Sprintf("Unhandled filemode: %v", m))
 	}

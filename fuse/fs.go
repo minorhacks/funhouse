@@ -92,7 +92,7 @@ func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr,
 			return nil, gofuse.EIO
 		}
 		return &gofuse.Attr{
-			Mode: uint32(resData.FileMode.ToSyscallMode()),
+			Mode: resData.FileMode.ToSyscallMode(),
 			Size: resData.Size,
 		}, gofuse.OK
 	}
@@ -295,7 +295,7 @@ func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.Dir
 		for _, entry := range resData.Entries {
 			dirs = append(dirs, gofuse.DirEntry{
 				Name: entry.Name,
-				Mode: uint32(entry.FileMode.ToSyscallMode()),
+				Mode: entry.FileMode.ToSyscallMode(),
 			})
 		}
 		return dirs, gofuse.OK
