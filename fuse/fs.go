@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"regexp"
 
 	"github.com/minorhacks/funhouse/service"
 
@@ -17,6 +18,10 @@ import (
 	gofuse "github.com/hanwen/go-fuse/fuse"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+)
+
+var (
+	commitHashPattern = regexp.MustCompile(`[0-9a-f]{40}`)
 )
 
 type GitFS struct {
@@ -51,7 +56,17 @@ func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr,
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
 	case len(path) == 2 && path[0] == "commits":
-		// Assuming each subdir here is a commit hash
+		// The right thing to do here is to query and see which paths are
+		// present, to avoid optimistically returning directories where none
+		// exist. This is important because GetAttr is called when programs are
+		// checking for file existence of files that don't necessarily exist.
+		//
+		// For now, just make sure path[1] looks like a commit hash; it's
+		// unlikely that false positives will be reported since that means that
+		// programs are checking for the existence of fabricated hashes.
+		if !commitHashPattern.MatchString(path[1]) {
+			return nil, gofuse.ENOENT
+		}
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
