@@ -2,11 +2,12 @@ package fuse
 
 import (
 	"bytes"
-	"strings"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -123,7 +124,7 @@ func (f *GitFS) Access(name string, mode uint32, context *gofuse.Context) (statu
 			glog.Errorf("Access(name=%q) failed: %v", name, status)
 		}
 	}()
-	return gofuse.ENOENT
+	return gofuse.ENOSYS
 }
 
 func (f *GitFS) Link(oldName string, newName string, context *gofuse.Context) gofuse.Status {
@@ -195,10 +196,47 @@ func (f *GitFS) Open(name string, flags uint32, context *gofuse.Context) (file n
 	glog.V(1).Infof("Open(name=%q, flags=%#x) called", name, flags)
 	defer func() {
 		if status != gofuse.OK {
-			glog.Errorf("Open(name=%q) failed: %v", name, status)
+			glog.Errorf("Open(name=%q, flags=%#x) failed: %v", name, flags, status)
 		}
 	}()
-	return nil, gofuse.ENOENT
+
+	// TODO: Do we need to check flags here?
+
+	path := strings.FieldsFunc(name, func(c rune) bool { return c == '/' })
+	// Expect the first elements to be ["commit", "<COMMIT HASH>"]
+	if len(path) < 3 {
+		return nil, gofuse.ENOENT
+	}
+	if path[0] != "commits" {
+		return nil, gofuse.ENOENT
+	}
+
+	client := &http.Client{}
+	r := &service.CatFileRequest{
+		CommitHash: path[1],
+		Path: strings.Join(path[2:], "/"),
+	}
+	body, err := json.Marshal(r)
+	if err != nil {
+		glog.Errorf("failed to marshal CatFileRequest: %v", err)
+		return nil, gofuse.EIO
+	}
+	req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "cat"}).String(), bytes.NewReader(body))
+	if err != nil {
+		glog.Errorf("failed to cat file: %v", err)
+		return nil, gofuse.EIO
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		glog.Errorf("failed to cat file: %v", err)
+		return nil, gofuse.EIO
+	}
+	defer res.Body.Close()
+	fileBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		glog.Errorf("Failed to read from response body: %v", err)
+	}
+	return nodefs.NewDataFile(fileBody), gofuse.OK
 }
 
 func (f *GitFS) Create(name string, flags uint32, mode uint32, context *gofuse.Context) (nodefs.File, gofuse.Status) {
@@ -316,7 +354,7 @@ func (f *GitFS) Readlink(name string, context *gofuse.Context) (link string, sta
 			glog.Errorf("Readlink(name=%q) failed: %v", name, status)
 		}
 	}()
-	return "", gofuse.ENOENT
+	return "", gofuse.ENOSYS
 }
 
 func (f *GitFS) StatFs(name string) *gofuse.StatfsOut {

@@ -103,6 +103,7 @@ func (s *Service) CatHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	req.Path = strings.TrimPrefix(req.Path, "/")
 
 	repo, err := s.getRepo(req.Repo)
 	if err != nil {

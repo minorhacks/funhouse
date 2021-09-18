@@ -50,10 +50,18 @@ func app() error {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		s := <-sigChan
-		glog.Infof("Caught %v; unmounting", s)
-		if err := mountState.Unmount(); err != nil {
-			glog.Errorf("Error while unmounting: %v", err)
+		for {
+			// If the FS is in use, then an unmount attempt will fail. The loop
+			// ensures that signals are still caught and the unmount is retried
+			// so that the user has a chance to exit without leaving a zombie
+			// FUSE mount.
+			s := <-sigChan
+			glog.Infof("Caught %v; unmounting", s)
+			if err := mountState.Unmount(); err != nil {
+				glog.Errorf("Error while unmounting: %v", err)
+			} else {
+				break
+			}
 		}
 	}()
 
