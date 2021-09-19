@@ -1,18 +1,13 @@
 package fuse
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"syscall"
 	"time"
 	"regexp"
 
-	"github.com/minorhacks/funhouse/service"
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
 	"github.com/golang/glog"
@@ -240,31 +235,12 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 			},
 		}, gofuse.OK
 	case len(path) == 1 && path[0] == "commits":
-		client := &http.Client{}
-		r := &service.ListCommitsRequest{}
-		body, err := json.Marshal(r)
+		res, err := f.Client.ListCommits(context.TODO(), &fspb.ListCommitsRequest{})
 		if err != nil {
-			glog.Errorf("failed to marshal ListCommitsRequest: %v", err)
+			glog.Errorf("ListCommits() returned error: %v", err)
 			return nil, gofuse.EIO
 		}
-		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "commits"}).String(), bytes.NewReader(body))
-		if err != nil {
-			glog.Errorf("failed to get commit list: %v", err)
-			return nil, gofuse.EIO
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			glog.Errorf("failed to get commit list: %v", err)
-			return nil, gofuse.EIO
-		}
-		defer res.Body.Close()
-		var resData service.ListCommitsResponse
-		err = json.NewDecoder(res.Body).Decode(&resData)
-		if err != nil {
-			glog.Errorf("failed to parse commit list response: %v", err)
-			return nil, gofuse.EIO
-		}
-		for _, hash := range resData.CommitHashes {
+		for _, hash := range res.Commits {
 			dirs = append(dirs, gofuse.DirEntry{
 				Name: hash,
 				Mode: syscall.S_IFDIR,
@@ -273,45 +249,24 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 		return dirs, gofuse.OK
 	case len(path) >= 2 && path[0] == "commits":
 		// Assume path[1] is the commit hash
-		client := &http.Client{}
 		var filePath string
 		if len(path) == 2 {
 			filePath = "/"
 		} else {
 			filePath = "/" + strings.Join(path[2:], "/")
 		}
-		r := &service.ListDirRequest{
-			CommitHash: path[1],
+		res, err := f.Client.ListDir(context.TODO(), &fspb.ListDirRequest{
+			Commit: path[1],
 			Path: filePath,
-		}
-
-		body, err := json.Marshal(r)
+		})
 		if err != nil {
-			glog.Errorf("failed to marshal ListCommitsRequest: %v", err)
+			glog.Errorf("ListDir(Commit=%q, Path=%q) returned error: %v", path[1], filePath, err)
 			return nil, gofuse.EIO
 		}
-
-		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "listdir"}).String(), bytes.NewReader(body))
-		if err != nil {
-			glog.Errorf("failed to get dir entry list: %v", err)
-			return nil, gofuse.EIO
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			glog.Errorf("failed to get dir entry list: %v", err)
-			return nil, gofuse.EIO
-		}
-		defer res.Body.Close()
-		var resData service.ListDirResponse
-		err = json.NewDecoder(res.Body).Decode(&resData)
-		if err != nil {
-			glog.Errorf("failed to parse dir entry list response: %v", err)
-			return nil, gofuse.EIO
-		}
-		for _, entry := range resData.Entries {
+		for _, entry := range res.Entries {
 			dirs = append(dirs, gofuse.DirEntry{
 				Name: entry.Name,
-				Mode: entry.FileMode.ToSyscallMode(),
+				Mode: toSyscallMode(entry.Mode),
 			})
 		}
 		return dirs, gofuse.OK
