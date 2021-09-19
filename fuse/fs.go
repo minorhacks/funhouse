@@ -96,23 +96,23 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 	return nil, gofuse.ENOENT
 }
 
-func (f *GitFS) Chmod(name string, mode uint32, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Chmod(name string, mode uint32, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Chown(name string, uid uint32, gid uint32, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Chown(name string, uid uint32, gid uint32, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Utimens(name string, atime *time.Time, mtime *time.Time, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Utimens(name string, atime *time.Time, mtime *time.Time, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Truncate(name string, size uint64, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Truncate(name string, size uint64, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Access(name string, mode uint32, context *gofuse.Context) (status gofuse.Status) {
+func (f *GitFS) Access(name string, mode uint32, ctx *gofuse.Context) (status gofuse.Status) {
 	// TODO: Implement
 	glog.V(1).Infof("Access(name=%q, mode=%#o) called", name, mode)
 	defer func() {
@@ -123,31 +123,31 @@ func (f *GitFS) Access(name string, mode uint32, context *gofuse.Context) (statu
 	return gofuse.ENOSYS
 }
 
-func (f *GitFS) Link(oldName string, newName string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Link(oldName string, newName string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Mkdir(name string, mode uint32, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Mkdir(name string, mode uint32, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Mknod(name string, mode uint32, dev uint32, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Mknod(name string, mode uint32, dev uint32, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Rename(oldName string, newName string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Rename(oldName string, newName string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Rmdir(name string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Rmdir(name string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Unlink(name string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Unlink(name string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) GetXAttr(name string, attribute string, context *gofuse.Context) (xattr []byte, status gofuse.Status) {
+func (f *GitFS) GetXAttr(name string, attribute string, ctx *gofuse.Context) (xattr []byte, status gofuse.Status) {
 	glog.V(1).Infof("GetXAttr(name=%q, attribute=%q) called", name, attribute)
 	defer func() {
 		if status != gofuse.OK {
@@ -159,7 +159,7 @@ func (f *GitFS) GetXAttr(name string, attribute string, context *gofuse.Context)
 	return nil, gofuse.OK
 }
 
-func (f *GitFS) ListXAttr(name string, context *gofuse.Context) (xattrs []string, status gofuse.Status) {
+func (f *GitFS) ListXAttr(name string, ctx *gofuse.Context) (xattrs []string, status gofuse.Status) {
 	glog.V(1).Infof("ListXAttr(name=%q) called", name)
 	defer func() {
 		if status != gofuse.OK {
@@ -171,11 +171,11 @@ func (f *GitFS) ListXAttr(name string, context *gofuse.Context) (xattrs []string
 	return nil, gofuse.OK
 }
 
-func (f *GitFS) RemoveXAttr(name string, attr string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) RemoveXAttr(name string, attr string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) SetXAttr(name string, attr string, data []byte, flags int, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) SetXAttr(name string, attr string, data []byte, flags int, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
@@ -217,11 +217,11 @@ func (f *GitFS) Open(name string, flags uint32, ctx *gofuse.Context) (file nodef
 	return nodefs.NewDataFile(res.Contents), gofuse.OK
 }
 
-func (f *GitFS) Create(name string, flags uint32, mode uint32, context *gofuse.Context) (nodefs.File, gofuse.Status) {
+func (f *GitFS) Create(name string, flags uint32, mode uint32, ctx *gofuse.Context) (nodefs.File, gofuse.Status) {
 	return nil, gofuse.EROFS
 }
 
-func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.DirEntry, status gofuse.Status) {
+func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntry, status gofuse.Status) {
 	glog.V(1).Infof("OpenDir(name=%q) called", name)
 	defer func() {
 		if status != gofuse.OK {
@@ -320,11 +320,11 @@ func (f *GitFS) OpenDir(name string, context *gofuse.Context) (dirs []gofuse.Dir
 	return nil, gofuse.ENOENT
 }
 
-func (f *GitFS) Symlink(value string, linkName string, context *gofuse.Context) gofuse.Status {
+func (f *GitFS) Symlink(value string, linkName string, ctx *gofuse.Context) gofuse.Status {
 	return gofuse.EROFS
 }
 
-func (f *GitFS) Readlink(name string, context *gofuse.Context) (link string, status gofuse.Status) {
+func (f *GitFS) Readlink(name string, ctx *gofuse.Context) (link string, status gofuse.Status) {
 	// TODO: implement
 	glog.V(1).Infof("Readlink(name=%q) called", name)
 	defer func() {
