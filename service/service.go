@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -30,7 +31,32 @@ type Service struct {
 }
 
 func (s *Service) GetFile(ctx context.Context, req *fspb.GetFileRequest) (*fspb.GetFileResponse, error ){
-	return nil, status.Error(codes.Unimplemented, "GetFile() not yet implemented")
+	req.Path = strings.TrimPrefix(req.Path, "/")
+
+	repo, err := s.getRepo("")
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found")
+	}
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.Commit))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "commit %q not found in repo: %v", req.Commit, err)
+	}
+	f, err := commit.File(req.Path)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "file %q not found at commit %q: %v", req.Path, req.Commit, err)
+	}
+	rdr, err := f.Blob.Reader()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't get reader for file %q at commit %q: %v", req.Path, req.Commit, err)
+	}
+	defer rdr.Close()
+
+	res := &fspb.GetFileResponse{}
+	res.Contents, err = ioutil.ReadAll(rdr)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error copying from %q at commit %q: %v", req.Path, req.Commit, err)
+	}
+	return res, nil
 }
 
 func (s *Service) GetAttributes(ctx context.Context, req *fspb.GetAttributesRequest) (*fspb.GetAttributesResponse, error) {
@@ -110,50 +136,6 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 	err = repo.pull(payload.Ref)
 	if err != nil {
 		glog.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Service) CatHandler(w http.ResponseWriter, r *http.Request) {
-	req := CatFileRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	req.Path = strings.TrimPrefix(req.Path, "/")
-
-	repo, err := s.getRepo(req.Repo)
-	if err != nil {
-		glog.Errorf("%s: %v", err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
-	if err != nil {
-		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	f, err := commit.File(req.Path)
-	if err != nil {
-		glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	rdr, err := f.Blob.Reader()
-	if err != nil {
-		glog.Errorf("%s: can't get reader for file %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer rdr.Close()
-
-	_, err = io.Copy(w, rdr)
-	if err != nil {
-		glog.Errorf("%s: error copying %q in repo %s@%s: %v", r.URL, req.Path, req.Repo, req.CommitHash, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
