@@ -11,10 +11,10 @@ import (
 	"github.com/minorhacks/funhouse/fuse"
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
-	"google.golang.org/grpc"
 	"github.com/golang/glog"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -74,7 +74,7 @@ func app() error {
 				break
 			}
 		}
-	}()	
+	}()
 
 	mountState.Serve()
 	return nil

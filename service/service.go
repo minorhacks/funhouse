@@ -1,8 +1,8 @@
 package service
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,10 +19,10 @@ import (
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	gitobject "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/golang/glog"
-	"google.golang.org/grpc/status"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/kylelemons/godebug/pretty"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Service struct {
@@ -31,7 +31,7 @@ type Service struct {
 	singleRepo *Repo
 }
 
-func (s *Service) GetFile(ctx context.Context, req *fspb.GetFileRequest) (*fspb.GetFileResponse, error ){
+func (s *Service) GetFile(ctx context.Context, req *fspb.GetFileRequest) (*fspb.GetFileResponse, error) {
 	req.Path = strings.TrimPrefix(req.Path, "/")
 
 	repo, err := s.getRepo("")
@@ -169,7 +169,7 @@ func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.
 		}
 		// Return an entry for the remaining entries
 		res.Entries = append(res.Entries, &fspb.DirEntry{
-			Name:     delta,
+			Name: delta,
 			Mode: FromGitFileMode(treeEntry.Mode),
 		})
 	}

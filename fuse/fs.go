@@ -3,10 +3,10 @@ package fuse
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
-	"regexp"
 
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
@@ -16,13 +16,11 @@ import (
 	"github.com/hanwen/go-fuse/fuse/pathfs"
 )
 
-var (
-	commitHashPattern = regexp.MustCompile(`[0-9a-f]{40}`)
-)
+var commitHashPattern = regexp.MustCompile(`[0-9a-f]{40}`)
 
 type GitFS struct {
 	ServerAddr string
-	Client fspb.GitReadFsClient
+	Client     fspb.GitReadFsClient
 }
 
 func (f *GitFS) String() string {
@@ -77,7 +75,7 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		}
 		res, err := f.Client.GetAttributes(context.TODO(), &fspb.GetAttributesRequest{
 			Commit: path[1],
-			Path: filePath,
+			Path:   filePath,
 		})
 		if err != nil {
 			glog.Errorf("GetAttributes(Commit=%q, Path=%q) returned error: %v", path[1], filePath, err)
@@ -203,7 +201,7 @@ func (f *GitFS) Open(name string, flags uint32, ctx *gofuse.Context) (file nodef
 
 	res, err := f.Client.GetFile(context.TODO(), &fspb.GetFileRequest{
 		Commit: path[1],
-		Path: strings.Join(path[2:], "/"),
+		Path:   strings.Join(path[2:], "/"),
 	})
 	if err != nil {
 		glog.Errorf("GetFile(Commit=%q, Path=%q) returned error: %v", path[1], strings.Join(path[2:], "/"), err)
@@ -257,7 +255,7 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 		}
 		res, err := f.Client.ListDir(context.TODO(), &fspb.ListDirRequest{
 			Commit: path[1],
-			Path: filePath,
+			Path:   filePath,
 		})
 		if err != nil {
 			glog.Errorf("ListDir(Commit=%q, Path=%q) returned error: %v", path[1], filePath, err)

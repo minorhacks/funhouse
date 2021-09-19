@@ -43,21 +43,6 @@ func FromGitFileMode(m gitfilemode.FileMode) fspb.FileMode {
 	}
 }
 
-func (m FileModeOld) ToSyscallMode() uint32 {
-	switch m {
-	case FileModeDir:
-		return syscall.S_IFDIR | 0o555
-	case FileModeRegular:
-		return syscall.S_IFREG | 0o444
-	case FileModeExecutable:
-		return syscall.S_IFREG | 0o555
-	case FileModeSymlink:
-		return syscall.S_IFLNK | 0o555
-	default:
-		panic(fmt.Sprintf("Unhandled filemode: %v", m))
-	}
-}
-
 type JSONTime struct {
 	time.Time
 }
@@ -86,9 +71,9 @@ type GetAttrRequest struct {
 
 type GetAttrResponse struct {
 	FileMode   FileModeOld `json:"file_mode"`
-	Size       uint64   `json:"size"`
-	CommitTime JSONTime `json:"commit_time"`
-	AuthorTime JSONTime `json:"author_time"`
+	Size       uint64      `json:"size"`
+	CommitTime JSONTime    `json:"commit_time"`
+	AuthorTime JSONTime    `json:"author_time"`
 }
 
 type ListCommitsRequest struct {
@@ -110,6 +95,6 @@ type ListDirResponse struct {
 }
 
 type DirEntry struct {
-	Name       string   `json:"name"`
-	FileMode   FileModeOld `json:"file_mode"`
+	Name     string      `json:"name"`
+	FileMode FileModeOld `json:"file_mode"`
 }

@@ -1,9 +1,9 @@
 package fuse
 
 import (
-	"syscall"
 	"fmt"
-	
+	"syscall"
+
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 )
 
