@@ -37,5 +37,16 @@ A collection of distorted Git mirrors
 
    ```
    # The example is a Rust repo, so with the proper Rust tooling installed:
+   cd /tmp/funhouse/commits/0802d5e6cee084a8f867c5406e46a3fca556bf4e
    CARGO_TARGET_DIR=/tmp/rust_build_out cargo build
    ```
+
+1. To unmount - `Ctrl-C` the client process.
+
+   If you get an error like:
+
+   ```
+   E0918 23:09:45.058320 3148580 main.go:72] Error while unmounting: /usr/bin/fusermount: failed to unmount /tmp/funhouse: Device or resource busy
+   ```
+
+   make sure you `cd` out of the mounted directory in all open terminals.
