@@ -2,6 +2,7 @@ package fuse
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 
 	"github.com/minorhacks/funhouse/service"
+	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
 	"github.com/golang/glog"
 	gofuse "github.com/hanwen/go-fuse/fuse"
@@ -26,6 +28,7 @@ var (
 
 type GitFS struct {
 	ServerAddr string
+	Client fspb.GitReadFsClient
 }
 
 func (f *GitFS) String() string {
@@ -36,7 +39,7 @@ func (f *GitFS) SetDebug(debug bool) {
 	// TODO: implement
 }
 
-func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr, status gofuse.Status) {
+func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, status gofuse.Status) {
 	glog.V(1).Infof("GetAttr(name=%q) called", name)
 	defer func() {
 		if status != gofuse.OK {
@@ -72,44 +75,23 @@ func (f *GitFS) GetAttr(name string, context *gofuse.Context) (ret *gofuse.Attr,
 		}, gofuse.OK
 	case len(path) >= 2 && path[0] == "commits":
 		// Assume path[1] is the commit hash
-		client := &http.Client{}
 		var filePath string
 		if len(path) == 2 {
 			filePath = "/"
 		} else {
 			filePath = "/" + strings.Join(path[2:], "/")
 		}
-		r := &service.GetAttrRequest{
-			CommitHash: path[1],
+		res, err := f.Client.GetAttributes(context.TODO(), &fspb.GetAttributesRequest{
+			Commit: path[1],
 			Path: filePath,
-		}
-
-		body, err := json.Marshal(r)
+		})
 		if err != nil {
-			glog.Errorf("failed to marshal GetAttrRequest: %v", err)
-			return nil, gofuse.EIO
-		}
-
-		req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "getattr"}).String(), bytes.NewReader(body))
-		if err != nil {
-			glog.Errorf("failed to get attrs for %q: %v", filePath, err)
-			return nil, gofuse.EIO
-		}
-		res, err := client.Do(req)
-		if err != nil {
-			glog.Errorf("failed to get attrs for %q: %v", filePath, err)
-			return nil, gofuse.EIO
-		}
-		defer res.Body.Close()
-		var resData service.GetAttrResponse
-		err = json.NewDecoder(res.Body).Decode(&resData)
-		if err != nil {
-			glog.Errorf("failed to parse attr response: %v", err)
+			glog.Errorf("GetAttributes(Commit=%q, Path=%q) returned error: %v", path[1], filePath, err)
 			return nil, gofuse.EIO
 		}
 		return &gofuse.Attr{
-			Mode: resData.FileMode.ToSyscallMode(),
-			Size: resData.Size,
+			Mode: toSyscallMode(res.Mode),
+			Size: res.SizeBytes,
 		}, gofuse.OK
 	}
 	return nil, gofuse.ENOENT

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/minorhacks/funhouse/fuse"
+	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
+	"google.golang.org/grpc"
 	"github.com/golang/glog"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
@@ -33,8 +35,17 @@ func main() {
 }
 
 func app() error {
+	conn, err := grpc.Dial(*serverAddr, []grpc.DialOption{
+		grpc.WithInsecure(),
+	}...)
+	if err != nil {
+		return fmt.Errorf("failed to dial %q: %v", *serverAddr, err)
+	}
+	defer conn.Close()
+	client := fspb.NewGitReadFsClient(conn)
+
 	fs := &fuse.GitFS{
-		ServerAddr: *serverAddr,
+		Client: client,
 	}
 	pathNodeFs := pathfs.NewPathNodeFs(fs, &pathfs.PathNodeFsOptions{})
 	mountState, _, err := nodefs.MountRoot(*mountPoint, pathNodeFs.Root(), &nodefs.Options{
@@ -63,7 +74,7 @@ func app() error {
 				break
 			}
 		}
-	}()
+	}()	
 
 	mountState.Serve()
 	return nil

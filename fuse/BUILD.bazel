@@ -5,10 +5,12 @@ go_library(
     srcs = [
         "file.go",
         "fs.go",
+        "util.go",
     ],
     importpath = "github.com/minorhacks/funhouse/fuse",
     visibility = ["//visibility:public"],
     deps = [
+        "//proto:git_read_fs_proto_go_proto",
         "//service",
         "@com_github_golang_glog//:glog",
         "@com_github_hanwen_go_fuse//fuse",
