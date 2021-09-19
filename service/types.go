@@ -6,13 +6,15 @@ import (
 	"syscall"
 	"time"
 
+	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
+
 	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
 )
 
-type FileMode uint32
+type FileModeOld uint32
 
 const (
-	FileModeEmpty FileMode = iota
+	FileModeEmpty FileModeOld = iota
 	FileModeDir
 	FileModeRegular
 	FileModeExecutable
@@ -20,28 +22,28 @@ const (
 	FileModeSubmodule
 )
 
-func FromGitFileMode(m gitfilemode.FileMode) FileMode {
+func FromGitFileMode(m gitfilemode.FileMode) fspb.FileMode {
 	switch m {
 	case gitfilemode.Empty:
-		return FileModeEmpty
+		return fspb.FileMode_MODE_EMPTY
 	case gitfilemode.Dir:
-		return FileModeDir
+		return fspb.FileMode_MODE_DIR
 	case gitfilemode.Regular:
-		return FileModeRegular
+		return fspb.FileMode_MODE_REGULAR
 	case gitfilemode.Deprecated:
-		return FileModeRegular
+		return fspb.FileMode_MODE_REGULAR
 	case gitfilemode.Executable:
-		return FileModeExecutable
+		return fspb.FileMode_MODE_EXECUTABLE
 	case gitfilemode.Symlink:
-		return FileModeSymlink
+		return fspb.FileMode_MODE_SYMLINK
 	case gitfilemode.Submodule:
-		return FileModeSubmodule
+		return fspb.FileMode_MODE_SUBMODULE
 	default:
-		panic(fmt.Sprintf("Unhandled filemode: %v", m))
+		return fspb.FileMode_MODE_UNKNOWN
 	}
 }
 
-func (m FileMode) ToSyscallMode() uint32 {
+func (m FileModeOld) ToSyscallMode() uint32 {
 	switch m {
 	case FileModeDir:
 		return syscall.S_IFDIR | 0o555
@@ -83,7 +85,7 @@ type GetAttrRequest struct {
 }
 
 type GetAttrResponse struct {
-	FileMode   FileMode `json:"file_mode"`
+	FileMode   FileModeOld `json:"file_mode"`
 	Size       uint64   `json:"size"`
 	CommitTime JSONTime `json:"commit_time"`
 	AuthorTime JSONTime `json:"author_time"`
@@ -109,5 +111,5 @@ type ListDirResponse struct {
 
 type DirEntry struct {
 	Name       string   `json:"name"`
-	FileMode   FileMode `json:"file_mode"`
+	FileMode   FileModeOld `json:"file_mode"`
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/kylelemons/godebug/pretty"
 )
 
@@ -60,7 +61,47 @@ func (s *Service) GetFile(ctx context.Context, req *fspb.GetFileRequest) (*fspb.
 }
 
 func (s *Service) GetAttributes(ctx context.Context, req *fspb.GetAttributesRequest) (*fspb.GetAttributesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "GetAttributes() not yet implemented")
+	req.Path = strings.TrimLeft(req.Path, "/")
+
+	repo, err := s.getRepo("")
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found")
+	}
+
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.Commit))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "commit %q not found in repo: %v", req.Commit, err)
+	}
+
+	rootTree, err := commit.Tree()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't get tree for commit %q: %v", req.Commit, err)
+	}
+
+	res := &fspb.GetAttributesResponse{
+		AuthorTime: timestamppb.New(commit.Author.When),
+		CommitTime: timestamppb.New(commit.Committer.When),
+	}
+	if req.Path == "" {
+		// go-git doesn't have any concept of a "root directory" apparently, so
+		// this is a hack to simulate it.
+		res.Mode = fspb.FileMode_MODE_DIR
+	} else {
+		entry, err := rootTree.FindEntry(req.Path)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "can't get file %q at commit %q: %v", req.Path, req.Commit, err)
+		}
+		res.Mode = FromGitFileMode(entry.Mode)
+		if entry.Mode.IsFile() {
+			entryFile, err := rootTree.TreeEntryFile(entry)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "can't get TreeEntry for file %q at commit %q: %v", req.Path, req.Commit, err)
+			}
+			res.SizeBytes = uint64(entryFile.Blob.Size)
+		}
+	}
+
+	return res, nil
 }
 
 func (s *Service) ListCommits(ctx context.Context, req *fspb.ListCommitsRequest) (*fspb.ListCommitsResponse, error) {
@@ -142,69 +183,6 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) GetAttrHandler(w http.ResponseWriter, r *http.Request) {
-	req := GetAttrRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	path := strings.TrimLeft(req.Path, "/")
-
-	repo, err := s.getRepo(req.Repo)
-	if err != nil {
-		glog.Errorf("%s: %v", err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
-	if err != nil {
-		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	rootTree, err := commit.Tree()
-	if err != nil {
-		glog.Errorf("%s: can't get tree for commit %q: %v", r.URL, req.CommitHash, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	res := &GetAttrResponse{}
-	res.AuthorTime = JSONTime{commit.Author.When}
-	res.CommitTime = JSONTime{commit.Committer.When}
-	if path == "" {
-		// go-git doesn't have any concept of a "root directory" apparently, so
-		// this is a hack to simulate it.
-		res.FileMode = FileModeDir
-	} else {
-		entry, err := rootTree.FindEntry(path)
-		if err != nil {
-			glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		res.FileMode = FromGitFileMode(entry.Mode)
-		if entry.Mode.IsFile() {
-			entryFile, err := rootTree.TreeEntryFile(entry)
-			if err != nil {
-				glog.Errorf("%s: can't get file %q in repo %s@%s: %v", r.URL, path, req.Repo, req.CommitHash, err)
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			res.Size = uint64(entryFile.Blob.Size)
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(&res)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 }
 
 func (s *Service) CommitsHandler(w http.ResponseWriter, r *http.Request) {
@@ -304,9 +282,10 @@ func (s *Service) ListDirHandler(w http.ResponseWriter, r *http.Request) {
 		// Return an entry for the remaining entries
 		res.Entries = append(res.Entries, &DirEntry{
 			Name:     delta,
-			FileMode: FromGitFileMode(treeEntry.Mode),
+			//FileMode: FromGitFileMode(treeEntry.Mode),
 		})
 	}
+	_ = treeEntry
 	if err != nil && err != io.EOF {
 		glog.Errorf("%s: error while iterating through files for commit %q: %v", r.URL, req.CommitHash, err)
 		w.WriteHeader(http.StatusInternalServerError)
