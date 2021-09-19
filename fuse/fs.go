@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -188,8 +187,7 @@ func (f *GitFS) OnUnmount() {
 	glog.V(1).Infof("OnUnmount() called")
 }
 
-func (f *GitFS) Open(name string, flags uint32, context *gofuse.Context) (file nodefs.File, status gofuse.Status) {
-	// TODO: implement
+func (f *GitFS) Open(name string, flags uint32, ctx *gofuse.Context) (file nodefs.File, status gofuse.Status) {
 	glog.V(1).Infof("Open(name=%q, flags=%#x) called", name, flags)
 	defer func() {
 		if status != gofuse.OK {
@@ -208,32 +206,15 @@ func (f *GitFS) Open(name string, flags uint32, context *gofuse.Context) (file n
 		return nil, gofuse.ENOENT
 	}
 
-	client := &http.Client{}
-	r := &service.CatFileRequest{
-		CommitHash: path[1],
+	res, err := f.Client.GetFile(context.TODO(), &fspb.GetFileRequest{
+		Commit: path[1],
 		Path: strings.Join(path[2:], "/"),
-	}
-	body, err := json.Marshal(r)
+	})
 	if err != nil {
-		glog.Errorf("failed to marshal CatFileRequest: %v", err)
+		glog.Errorf("GetFile(Commit=%q, Path=%q) returned error: %v", path[1], strings.Join(path[2:], "/"), err)
 		return nil, gofuse.EIO
 	}
-	req, err := http.NewRequest("GET", (&url.URL{Scheme: "http", Host: f.ServerAddr, Path: "cat"}).String(), bytes.NewReader(body))
-	if err != nil {
-		glog.Errorf("failed to cat file: %v", err)
-		return nil, gofuse.EIO
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		glog.Errorf("failed to cat file: %v", err)
-		return nil, gofuse.EIO
-	}
-	defer res.Body.Close()
-	fileBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		glog.Errorf("Failed to read from response body: %v", err)
-	}
-	return nodefs.NewDataFile(fileBody), gofuse.OK
+	return nodefs.NewDataFile(res.Contents), gofuse.OK
 }
 
 func (f *GitFS) Create(name string, flags uint32, mode uint32, context *gofuse.Context) (nodefs.File, gofuse.Status) {
