@@ -128,7 +128,56 @@ func (s *Service) ListCommits(ctx context.Context, req *fspb.ListCommitsRequest)
 }
 
 func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.ListDirResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "ListDir() not yet implemented")
+	// Ensure the string is properly suffixed for a directory
+	if !strings.HasPrefix(req.Path, "/") {
+		req.Path = "/" + req.Path
+	}
+	if !strings.HasSuffix(req.Path, "/") {
+		req.Path = req.Path + "/"
+	}
+
+	repo, err := s.getRepo("")
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found")
+	}
+
+	res := &fspb.ListDirResponse{}
+
+	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.Commit))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "commit %q not found in repo: %v", req.Commit, err)
+	}
+
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't get tree for commit %q: %v", req.Commit, err)
+	}
+	treeIter := gitobject.NewTreeWalker(tree, true /* recursive */, nil)
+	defer treeIter.Close()
+
+	var name string
+	var treeEntry gitobject.TreeEntry
+	for name, treeEntry, err = treeIter.Next(); err == nil; name, treeEntry, err = treeIter.Next() {
+		name = "/" + name
+		// Filter out all files not direct descendants of the specified dir
+		if !strings.HasPrefix(name, req.Path) {
+			continue
+		}
+		delta := strings.TrimPrefix(name, req.Path)
+		if strings.Contains(delta, "/") {
+			continue
+		}
+		// Return an entry for the remaining entries
+		res.Entries = append(res.Entries, &fspb.DirEntry{
+			Name:     delta,
+			Mode: FromGitFileMode(treeEntry.Mode),
+		})
+	}
+	if err != nil && err != io.EOF {
+		return nil, status.Errorf(codes.Internal, "error while iterating through files for commit %q: %v", req.Commit, err)
+	}
+
+	return res, nil
 }
 
 func NewSingle(basePath string, repoURL string) (*Service, error) {
@@ -196,80 +245,6 @@ func (s *Service) MirrorHandler(w http.ResponseWriter, r *http.Request) {
 	err = repo.pull(payload.Ref)
 	if err != nil {
 		glog.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Service) ListDirHandler(w http.ResponseWriter, r *http.Request) {
-	req := ListDirRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		glog.Errorf("%s: failed to unmarshal payload: %v", r.URL, err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	// Ensure the string is properly suffixed for a directory
-	if !strings.HasPrefix(req.Path, "/") {
-		req.Path = "/" + req.Path
-	}
-	if !strings.HasSuffix(req.Path, "/") {
-		req.Path = req.Path + "/"
-	}
-
-	repo, err := s.getRepo(req.Repo)
-	if err != nil {
-		glog.Errorf("%s: %v", err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	res := &ListDirResponse{}
-
-	commit, err := repo.repo.CommitObject(gitplumbing.NewHash(req.CommitHash))
-	if err != nil {
-		glog.Errorf("%s: can't get commit %q in repo %q: %v", r.URL, req.CommitHash, req.Repo, err)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	tree, err := commit.Tree()
-	if err != nil {
-		glog.Errorf("%s: can't get tree for commit %q: %v", r.URL, req.CommitHash, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	treeIter := gitobject.NewTreeWalker(tree, true /* recursive */, nil)
-	defer treeIter.Close()
-
-	var name string
-	var treeEntry gitobject.TreeEntry
-	for name, treeEntry, err = treeIter.Next(); err == nil; name, treeEntry, err = treeIter.Next() {
-		name = "/" + name
-		// Filter out all files not direct descendants of the specified dir
-		if !strings.HasPrefix(name, req.Path) {
-			continue
-		}
-		delta := strings.TrimPrefix(name, req.Path)
-		if strings.Contains(delta, "/") {
-			continue
-		}
-		// Return an entry for the remaining entries
-		res.Entries = append(res.Entries, &DirEntry{
-			Name:     delta,
-			//FileMode: FromGitFileMode(treeEntry.Mode),
-		})
-	}
-	_ = treeEntry
-	if err != nil && err != io.EOF {
-		glog.Errorf("%s: error while iterating through files for commit %q: %v", r.URL, req.CommitHash, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(&res)
-	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
