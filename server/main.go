@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/minorhacks/funhouse/service"
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
+	"github.com/minorhacks/funhouse/service"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
@@ -17,8 +17,8 @@ import (
 
 var (
 	grpcPort = flag.Int("grpc_port", 8080, "Port of gRPC service")
-	basePath   = flag.String("base_path", "/tmp/funhouse", "Path to store cloned repository data")
-	singleRepo = flag.String("single_repo", "", "If set, clone and serve a single repository at this URL")
+	basePath = flag.String("base_path", "/tmp/funhouse", "Path to store cloned repository data")
+	repoURL  = flag.String("repo_url", "", "Clone and serve a single repository at this URL")
 )
 
 func main() {
@@ -32,10 +32,10 @@ func main() {
 func app() error {
 	var s *service.Service
 	var err error
-	if *singleRepo == "" {
-		return fmt.Errorf("--single_repo must be set")
+	if *repoURL == "" {
+		return fmt.Errorf("--repo_url must be set")
 	} else {
-		s, err = service.NewSingle(*basePath, *singleRepo)
+		s, err = service.New(*basePath, *repoURL)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create service: %v", err)

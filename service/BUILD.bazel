@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "repo.go",
         "service.go",
-        "types.go",
     ],
     importpath = "github.com/minorhacks/funhouse/service",
     visibility = ["//visibility:public"],
