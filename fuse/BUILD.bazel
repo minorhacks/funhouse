@@ -15,5 +15,7 @@ go_library(
         "@com_github_hanwen_go_fuse//fuse",
         "@com_github_hanwen_go_fuse//fuse/nodefs",
         "@com_github_hanwen_go_fuse//fuse/pathfs",
+        "@org_golang_google_grpc//codes:go_default_library",
+        "@org_golang_google_grpc//status:go_default_library",
     ],
 )

@@ -14,6 +14,8 @@ import (
 	gofuse "github.com/hanwen/go-fuse/fuse"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+	"google.golang.org/grpc/codes"
+	grpcstat "google.golang.org/grpc/status"
 )
 
 var commitHashPattern = regexp.MustCompile(`[0-9a-f]{40}`)
@@ -79,7 +81,7 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		})
 		if err != nil {
 			glog.Errorf("GetAttributes(Commit=%q, Path=%q) returned error: %v", path[1], filePath, err)
-			return nil, gofuse.EIO
+			return nil, errnoFromCode(grpcstat.Convert(err))
 		}
 		return &gofuse.Attr{
 			Mode: toSyscallMode(res.Mode),
@@ -292,4 +294,17 @@ func (f *GitFS) StatFs(name string) *gofuse.StatfsOut {
 	// TODO: implement
 	glog.V(1).Infof("StatFs(name=%q) called", name)
 	return &gofuse.StatfsOut{}
+}
+
+func errnoFromCode(s *grpcstat.Status) gofuse.Status {
+	switch s.Code() {
+	case codes.NotFound:
+		return gofuse.ENOENT
+	case codes.Unimplemented:
+		return gofuse.ENOSYS
+	case codes.Internal:
+		return gofuse.EIO
+	default:
+		return gofuse.EIO
+	}
 }
