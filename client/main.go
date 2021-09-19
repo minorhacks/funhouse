@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/minorhacks/funhouse/fuse"
+	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
 	"github.com/golang/glog"
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -33,8 +35,17 @@ func main() {
 }
 
 func app() error {
+	conn, err := grpc.Dial(*serverAddr, []grpc.DialOption{
+		grpc.WithInsecure(),
+	}...)
+	if err != nil {
+		return fmt.Errorf("failed to dial %q: %v", *serverAddr, err)
+	}
+	defer conn.Close()
+	client := fspb.NewGitReadFsClient(conn)
+
 	fs := &fuse.GitFS{
-		ServerAddr: *serverAddr,
+		Client: client,
 	}
 	pathNodeFs := pathfs.NewPathNodeFs(fs, &pathfs.PathNodeFsOptions{})
 	mountState, _, err := nodefs.MountRoot(*mountPoint, pathNodeFs.Root(), &nodefs.Options{
@@ -50,10 +61,18 @@ func app() error {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		s := <-sigChan
-		glog.Infof("Caught %v; unmounting", s)
-		if err := mountState.Unmount(); err != nil {
-			glog.Errorf("Error while unmounting: %v", err)
+		for {
+			// If the FS is in use, then an unmount attempt will fail. The loop
+			// ensures that signals are still caught and the unmount is retried
+			// so that the user has a chance to exit without leaving a zombie
+			// FUSE mount.
+			s := <-sigChan
+			glog.Infof("Caught %v; unmounting", s)
+			if err := mountState.Unmount(); err != nil {
+				glog.Errorf("Error while unmounting: %v", err)
+			} else {
+				break
+			}
 		}
 	}()
 

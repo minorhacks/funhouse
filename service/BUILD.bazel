@@ -5,12 +5,12 @@ go_library(
     srcs = [
         "repo.go",
         "service.go",
-        "types.go",
     ],
     importpath = "github.com/minorhacks/funhouse/service",
     visibility = ["//visibility:public"],
     deps = [
         "//github",
+        "//proto:git_read_fs_proto_go_proto",
         "@com_github_go_git_go_git_v5//:go-git",
         "@com_github_go_git_go_git_v5//config",
         "@com_github_go_git_go_git_v5//plumbing",
@@ -18,5 +18,8 @@ go_library(
         "@com_github_go_git_go_git_v5//plumbing/object",
         "@com_github_golang_glog//:glog",
         "@com_github_kylelemons_godebug//pretty",
+        "@org_golang_google_grpc//codes:go_default_library",
+        "@org_golang_google_grpc//status:go_default_library",
+        "@org_golang_google_protobuf//types/known/timestamppb:go_default_library",
     ],
 )

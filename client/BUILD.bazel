@@ -13,8 +13,10 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//fuse",
+        "//proto:git_read_fs_proto_go_proto",
         "@com_github_golang_glog//:glog",
         "@com_github_hanwen_go_fuse//fuse/nodefs",
         "@com_github_hanwen_go_fuse//fuse/pathfs",
+        "@org_golang_google_grpc//:go_default_library",
     ],
 )

@@ -8,8 +8,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 )
 
-type GitFile struct {
-}
+type GitFile struct{}
 
 func (f *GitFile) SetInode(inode *nodefs.Inode) {
 	glog.V(1).Infof("SetInode() called")
@@ -136,7 +135,7 @@ func (f *GitFile) GetAttr(out *gofuse.Attr) (status gofuse.Status) {
 }
 
 func (f *GitFile) Chown(uid uint32, gid uint32) (status gofuse.Status) {
-	glog.V(1).Infof("Chown(uid=%d, gid=%d) called",uid,gid)
+	glog.V(1).Infof("Chown(uid=%d, gid=%d) called", uid, gid)
 	defer func() {
 		if status != gofuse.OK {
 			glog.Error("Chown(uid=%d, gid=%d) error: %v", uid, gid, status)
@@ -148,7 +147,7 @@ func (f *GitFile) Chown(uid uint32, gid uint32) (status gofuse.Status) {
 }
 
 func (f *GitFile) Chmod(perms uint32) (status gofuse.Status) {
-	glog.V(1).Infof("Chmod(perms=%#o) called",perms)
+	glog.V(1).Infof("Chmod(perms=%#o) called", perms)
 	defer func() {
 		if status != gofuse.OK {
 			glog.Error("Chmod(perms=%#o) error: %v", perms, status)
