@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,11 +12,14 @@ import (
 	"sync"
 
 	"github.com/minorhacks/funhouse/github"
+	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
 	git "github.com/go-git/go-git/v5"
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	gitobject "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/golang/glog"
+	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/codes"
 	"github.com/kylelemons/godebug/pretty"
 )
 
@@ -23,6 +27,22 @@ type Service struct {
 	BasePath   string
 	repoMap    sync.Map
 	singleRepo *Repo
+}
+
+func (s *Service) GetFile(ctx context.Context, req *fspb.GetFileRequest) (*fspb.GetFileResponse, error ){
+	return nil, status.Error(codes.Unimplemented, "GetFile() not yet implemented")
+}
+
+func (s *Service) GetAttributes(ctx context.Context, req *fspb.GetAttributesRequest) (*fspb.GetAttributesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "GetAttributes() not yet implemented")
+}
+
+func (s *Service) ListCommits(ctx context.Context, req *fspb.ListCommitsRequest) (*fspb.ListCommitsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "ListCommits() not yet implemented")
+}
+
+func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.ListDirResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "ListDir() not yet implemented")
 }
 
 func NewSingle(basePath string, repoURL string) (*Service, error) {

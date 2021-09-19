@@ -2,6 +2,8 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
+option go_package = "github.com/minorhacks/funhouse/proto/git_read_fs_proto";
+
 package funhouse.git_read_fs;
 
 service GitReadFs {
