@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 var (
@@ -36,7 +38,9 @@ func main() {
 
 func app() error {
 	conn, err := grpc.Dial(*serverAddr, []grpc.DialOption{
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: true,
+		})),
 	}...)
 	if err != nil {
 		return fmt.Errorf("failed to dial %q: %v", *serverAddr, err)
