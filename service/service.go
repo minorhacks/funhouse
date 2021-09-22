@@ -12,7 +12,6 @@ import (
 	"github.com/minorhacks/funhouse/github"
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
-	git "github.com/go-git/go-git/v5"
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
 	gitobject "github.com/go-git/go-git/v5/plumbing/object"
@@ -109,7 +108,7 @@ func (s *Service) GetAttributes(ctx context.Context, req *fspb.GetAttributesRequ
 
 func (s *Service) ListCommits(ctx context.Context, req *fspb.ListCommitsRequest) (*fspb.ListCommitsResponse, error) {
 	res := &fspb.ListCommitsResponse{}
-	iter, err := s.repo.repo.Log(&git.LogOptions{})
+	iter, err := s.repo.repo.CommitObjects()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get commit iterator: %v", err)
 	}
@@ -181,13 +180,11 @@ func (s *Service) PushHook(w http.ResponseWriter, r *http.Request) {
 		glog.Errorf("PushHook: Failed to decode payload: %v", err)
 		return
 	}
-	// TODO: Technically this might not fetch the precise commit named by the
-	// hook.
-	err = s.repo.pull(payload.Ref)
+	err = s.repo.pull(payload.After)
 	if err != nil {
-		glog.Errorf("PushHook: Failed to update %q: %v", payload.Ref, err)
+		glog.Errorf("PushHook: Failed to pull %q: %v", payload.After, err)
 	}
-	glog.Infof("Updated %s to %s", payload.Ref, payload.After)
+	glog.Infof("PushHook: pulled %s from ref %s", payload.After, payload.Ref)
 }
 
 func fromGitFileMode(m gitfilemode.FileMode) fspb.FileMode {
