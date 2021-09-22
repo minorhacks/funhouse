@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"strings"
 
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
@@ -13,6 +14,7 @@ import (
 	gitplumbing "github.com/go-git/go-git/v5/plumbing"
 	gitfilemode "github.com/go-git/go-git/v5/plumbing/filemode"
 	gitobject "github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -167,6 +169,17 @@ func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.
 	}
 
 	return res, nil
+}
+
+func (s *Service) PushHook(w http.ResponseWriter, r *http.Request) {
+	// Simply log the payload
+	defer r.Body.Close()
+	contents, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		glog.Errorf("PushHook: Error reading body: %v", err)
+		return
+	}
+	glog.Infof("PushHook: %s", string(contents))
 }
 
 func fromGitFileMode(m gitfilemode.FileMode) fspb.FileMode {

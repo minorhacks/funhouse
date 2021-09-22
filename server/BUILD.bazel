@@ -17,6 +17,7 @@ go_library(
         "//proto:git_read_fs_proto_go_proto",
         "//service",
         "@com_github_golang_glog//:glog",
+        "@com_github_gorilla_mux//:mux",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//reflection:go_default_library",
     ],
