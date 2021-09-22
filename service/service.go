@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
+	"github.com/minorhacks/funhouse/github"
 	fspb "github.com/minorhacks/funhouse/proto/git_read_fs_proto"
 
 	git "github.com/go-git/go-git/v5"
@@ -172,14 +174,20 @@ func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.
 }
 
 func (s *Service) PushHook(w http.ResponseWriter, r *http.Request) {
-	// Simply log the payload
 	defer r.Body.Close()
-	contents, err := ioutil.ReadAll(r.Body)
+	var payload github.PushPayload
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
-		glog.Errorf("PushHook: Error reading body: %v", err)
+		glog.Errorf("PushHook: Failed to decode payload: %v", err)
 		return
 	}
-	glog.Infof("PushHook: %s", string(contents))
+	// TODO: Technically this might not fetch the precise commit named by the
+	// hook.
+	err = s.repo.pull(payload.Ref)
+	if err != nil {
+		glog.Errorf("PushHook: Failed to update %q: %v", payload.Ref, err)
+	}
+	glog.Infof("Updated %s to %s", payload.Ref, payload.After)
 }
 
 func fromGitFileMode(m gitfilemode.FileMode) fspb.FileMode {

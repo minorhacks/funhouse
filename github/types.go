@@ -8,5 +8,5 @@ type PushPayload struct {
 }
 
 type Repository struct {
-	URL string `json:"URL"`
+	FullName string `json:"full_name"`
 }

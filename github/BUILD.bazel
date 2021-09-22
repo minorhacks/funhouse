@@ -10,6 +10,10 @@ go_library(
 go_test(
     name = "github_test",
     srcs = ["types_test.go"],
+    data = glob(["testdata/**"]),
     embed = [":github"],
-    deps = ["@com_github_google_go_cmp//cmp"],
+    deps = [
+        "@com_github_google_go_cmp//cmp",
+        "@io_bazel_rules_go//go/tools/bazel:go_default_library",
+    ],
 )
