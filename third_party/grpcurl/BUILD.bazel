@@ -1,0 +1,31 @@
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_layer")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_push")
+
+container_layer(
+    name = "grpcurl_layer",
+    directory = "app",
+    files = [":grpcurl"],
+)
+
+container_image(
+    name = "image",
+    base = "@distroless_debug_base//image",
+    entrypoint = [
+        "/app/grpcurl",
+    ],
+    labels = {
+        "org.opencontainers.image.source": "https://github.com/minorhacks/funhouse",
+    },
+    layers = [
+        ":grpcurl_layer",
+    ],
+    stamp = True,
+)
+
+docker_push(
+    name = "image_push",
+    image = ":image",
+    registry = "ghcr.io",
+    repository = "minorhacks/grpcurl",
+    tag = "{STABLE_GIT_BRANCH}",
+)
