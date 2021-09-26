@@ -22,6 +22,7 @@ import (
 var (
 	mountPoint = flag.String("mount_point", "", "Location where filesystem should be mounted")
 	serverAddr = flag.String("server_addr", "", "Address of API server")
+	insecure = flag.Bool("insecure", false, "Disables TLS usage")
 
 	entryTTL    = flag.Float64("entry_ttl", 1.0, "FUSE entry cache TTL")
 	negativeTTL = flag.Float64("negative_ttl", 1.0, "FUSE negative entry cache TTL")
@@ -37,11 +38,15 @@ func main() {
 }
 
 func app() error {
-	conn, err := grpc.Dial(*serverAddr, []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+	var options []grpc.DialOption
+	if *insecure {
+		options = append(options, grpc.WithInsecure())
+	} else {
+		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
 			InsecureSkipVerify: true,
-		})),
-	}...)
+		})))
+	}
+	conn, err := grpc.Dial(*serverAddr, options...)
 	if err != nil {
 		return fmt.Errorf("failed to dial %q: %v", *serverAddr, err)
 	}
