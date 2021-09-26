@@ -50,30 +50,3 @@ A collection of distorted Git mirrors
    ```
 
    make sure you `cd` out of the mounted directory in all open terminals.
-
-## Development
-
-### Updating BUILD files after Go changes
-
-1. Run `gazelle`:
-
-   ```
-   bazel run //:gazelle
-   ```
-
-### Updating Go third-party dependencies
-
-1. Make updates to `go.mod` via `go get` commands:
-
-   ```
-   go get -d golang.org/x/tools@v0.1.4
-   ```
-
-1. Run `gazelle` to generate Bazel imports from `go.mod`:
-
-   ```
-   bazel run //:gazelle -- \
-     update-repos \
-     -from_file=go.mod \
-     -to_macro=third_party/go_deps.bzl%go_third_party_deps
-   ```
