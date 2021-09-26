@@ -52,6 +52,10 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
+	case len(path) == 1 && path[0] == "branches":
+		return &gofuse.Attr{
+			Mode: syscall.S_IFDIR,
+		}, gofuse.OK
 	case len(path) == 2 && path[0] == "commits":
 		// The right thing to do here is to query and see which paths are
 		// present, to avoid optimistically returning directories where none
@@ -67,6 +71,11 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
+	case len(path) == 2 && path[1] == "branches":
+		// Get the list of branches
+		// Return ENOENT if the branch name is not recognized
+		// Return a symlink to the branch's commit
+		return nil, gofuse.ENOSYS
 	case len(path) >= 2 && path[0] == "commits":
 		// Assume path[1] is the commit hash
 		var filePath string
@@ -233,6 +242,10 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 				Name: "commits",
 				Mode: syscall.S_IFDIR,
 			},
+			{
+				Name: "branches",
+				Mode: syscall.S_IFDIR,
+			},
 		}, gofuse.OK
 	case len(path) == 1 && path[0] == "commits":
 		res, err := f.Client.ListCommits(context.TODO(), &fspb.ListCommitsRequest{})
@@ -247,6 +260,9 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 			})
 		}
 		return dirs, gofuse.OK
+	case len(path) == 1 && path[0] == "branches":
+		// TODO: implement
+		return nil, gofuse.ENOSYS
 	case len(path) >= 2 && path[0] == "commits":
 		// Assume path[1] is the commit hash
 		var filePath string

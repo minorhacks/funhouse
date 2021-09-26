@@ -172,6 +172,10 @@ func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.
 	return res, nil
 }
 
+func (s *Service) ListBranches(ctx context.Context, req *fspb.ListBranchesRequest) (*fspb.ListBranchesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "not yet implemented")
+}
+
 func (s *Service) PushHook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var payload github.PushPayload
