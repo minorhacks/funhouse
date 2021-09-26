@@ -173,7 +173,21 @@ func (s *Service) ListDir(ctx context.Context, req *fspb.ListDirRequest) (*fspb.
 }
 
 func (s *Service) ListBranches(ctx context.Context, req *fspb.ListBranchesRequest) (*fspb.ListBranchesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "not yet implemented")
+	branches, err := s.repo.repo.Branches()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to iterate over branches: %v", err)
+	}
+
+	res := &fspb.ListBranchesResponse{
+		Branches: map[string]string{},
+	}
+
+	err = branches.ForEach(func (ref *gitplumbing.Reference) error {
+		res.Branches[ref.Name().Short()] = ref.Hash().String()
+		return nil
+	})
+	
+	return res, nil
 }
 
 func (s *Service) PushHook(w http.ResponseWriter, r *http.Request) {
