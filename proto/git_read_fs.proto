@@ -11,6 +11,7 @@ service GitReadFs {
   rpc GetAttributes(GetAttributesRequest) returns (GetAttributesResponse) {}
   rpc ListCommits(ListCommitsRequest) returns (ListCommitsResponse) {}
   rpc ListDir(ListDirRequest) returns (ListDirResponse) {}
+  rpc ListBranches(ListBranchesRequest) returns (ListBranchesResponse) {}
 }
 
 enum FileMode {
@@ -52,6 +53,13 @@ message ListDirRequest {
 }
 
 message ListDirResponse { repeated DirEntry entries = 1; }
+
+message ListBranchesRequest {}
+
+message ListBranchesResponse {
+  // Map of branch name to commit hash
+  map<string, string> branches = 1;
+}
 
 message DirEntry {
   string name = 1;

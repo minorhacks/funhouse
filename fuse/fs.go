@@ -41,7 +41,7 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		}
 	}()
 
-	path := strings.FieldsFunc(name, func(c rune) bool { return c == os.PathSeparator })
+	path := strings.FieldsFunc(name, func(c rune) bool { return c == '/' })
 	// Simulate top-level dirs
 	switch {
 	case len(path) == 0:
@@ -49,6 +49,10 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
 	case len(path) == 1 && path[0] == "commits":
+		return &gofuse.Attr{
+			Mode: syscall.S_IFDIR,
+		}, gofuse.OK
+	case len(path) == 1 && path[0] == "branches":
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
 		}, gofuse.OK
@@ -66,6 +70,22 @@ func (f *GitFS) GetAttr(name string, ctx *gofuse.Context) (ret *gofuse.Attr, sta
 		}
 		return &gofuse.Attr{
 			Mode: syscall.S_IFDIR,
+		}, gofuse.OK
+	case len(path) == 2 && path[0] == "branches":
+		// Get the list of branches
+		res, err := f.Client.ListBranches(context.TODO(), &fspb.ListBranchesRequest{})
+		if err != nil {
+			glog.Errorf("GetAttributes(Path=%q) returned error: %v", name, err)
+			return nil, errnoFromCode(grpcstat.Convert(err))
+		}
+		// Return ENOENT if the branch name is not recognized
+		if _, ok := res.Branches[path[1]]; !ok {
+			glog.Errorf("GetAttributes(Path=%q) branch %q not found", name, path[1])
+			return nil, gofuse.ENOENT
+		}
+		// Return a symlink to the branch's commit
+		return &gofuse.Attr{
+			Mode: syscall.S_IFLNK,
 		}, gofuse.OK
 	case len(path) >= 2 && path[0] == "commits":
 		// Assume path[1] is the commit hash
@@ -233,6 +253,10 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 				Name: "commits",
 				Mode: syscall.S_IFDIR,
 			},
+			{
+				Name: "branches",
+				Mode: syscall.S_IFDIR,
+			},
 		}, gofuse.OK
 	case len(path) == 1 && path[0] == "commits":
 		res, err := f.Client.ListCommits(context.TODO(), &fspb.ListCommitsRequest{})
@@ -244,6 +268,19 @@ func (f *GitFS) OpenDir(name string, ctx *gofuse.Context) (dirs []gofuse.DirEntr
 			dirs = append(dirs, gofuse.DirEntry{
 				Name: hash,
 				Mode: syscall.S_IFDIR,
+			})
+		}
+		return dirs, gofuse.OK
+	case len(path) == 1 && path[0] == "branches":
+		res, err := f.Client.ListBranches(context.TODO(), &fspb.ListBranchesRequest{})
+		if err != nil {
+			glog.Errorf("OpenDir(Path=%q) returned error: %v", name, err)
+			return nil, errnoFromCode(grpcstat.Convert(err))
+		}
+		for branchName := range res.Branches {
+			dirs = append(dirs, gofuse.DirEntry{
+				Name: branchName,
+				Mode: syscall.S_IFLNK,
 			})
 		}
 		return dirs, gofuse.OK
@@ -287,6 +324,24 @@ func (f *GitFS) Readlink(name string, ctx *gofuse.Context) (link string, status 
 			glog.Errorf("Readlink(name=%q) failed: %v", name, status)
 		}
 	}()
+
+	path := strings.FieldsFunc(name, func(c rune) bool { return c == '/' })
+
+	switch {
+	case len(path) == 2 && path[0] == "branches":
+		res, err := f.Client.ListBranches(context.TODO(), &fspb.ListBranchesRequest{})
+		if err != nil {
+			glog.Errorf("Readlink(Path=%q) returned error: %v", name, err)
+			return "", errnoFromCode(grpcstat.Convert(err))
+		}
+		commit, ok := res.Branches[path[1]]
+		if !ok {
+			glog.Errorf("Readlink(Path=%q) branch %q not found", name, path[1])
+			return "", gofuse.ENOENT
+		}
+		return "../commits/"+commit, gofuse.OK
+	}
+
 	return "", gofuse.ENOSYS
 }
 
