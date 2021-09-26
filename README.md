@@ -24,6 +24,7 @@ A collection of distorted Git mirrors
    bazel run //client -- \
      --mount_point=/tmp/funhouse \
      --server_addr=localhost:8080 \
+     --insecure \
      --alsologtostderr
    ```
 
