@@ -1,0 +1,50 @@
+resources:
+  - name: git-source
+    type: git
+    icon: github
+    source:
+      uri: https://github.com/minorhacks/funhouse
+      branch: main
+  - name: bazel
+    type: registry-image
+    source:
+      repository: docker.io/kernald/bazel
+      tag: 4.2.1
+  - name: funhouse-server-image
+    type: registry-image
+    icon: docker
+    source:
+      repository: ghcr.io/minorhacks/funhouse_server
+      tag: main
+      username: minor-fixes
+      password: e7179d02b2688288fb26047448543eab47b7edcd
+
+jobs:
+  - name: build-server-image
+    plan:
+      - in_parallel:
+          - get: git-source
+            trigger: true
+          - get: bazel
+      - task: build-image
+        image: bazel
+        config:
+          platform: linux
+          inputs:
+            - name: git-source
+          outputs:
+            - name: funhouse_image
+          run:
+            dir: git-source
+            path: sh
+            args:
+              - -exc
+              - bazel build //server:funhouse_server_image.tar && cp bazel-bin/server/funhouse_server_image.tar ../funhouse_image/funhouse_server_image.tar
+              - --stamp
+              - --
+              - //server:funhouse_server_image_push
+      - put: funhouse-server-image
+        inputs:
+          - funhouse_image
+        params:
+          image: funhouse_image/funhouse_server_image.tar

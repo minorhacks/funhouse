@@ -1,0 +1,71 @@
+resource_types:
+  - name: pull-request
+    type: docker-image
+    source:
+      repository: teliaoss/github-pr-resource
+
+resources:
+  - name: pull-request
+    type: pull-request
+    icon: github
+    check_every: 24h
+    webhook_token: 2AAE6C35C94FCFB415DBE95F408B9CE91EE846ED
+    source:
+      repository: minorhacks/funhouse
+      access_token: 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
+  - name: bazel
+    type: registry-image
+    source:
+      repository: docker.io/kernald/bazel
+      tag: 4.2.1
+
+jobs:
+  - name: checks
+    plan:
+      - in_parallel:
+          - get: bazel
+          - get: pull-request
+            trigger: true
+            version: every
+      - put: pull-request
+        params:
+          path: pull-request
+          status: pending
+      - task: build
+        image: bazel
+        config:
+          platform: linux
+          inputs:
+            - name: pull-request
+          run:
+            dir: pull-request
+            path: bazel
+            args:
+              - build
+              - //...
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+      - task: test
+        image: bazel
+        config:
+          platform: linux
+          inputs:
+            - name: pull-request
+          run:
+            dir: pull-request
+            path: bazel
+            args:
+              - test
+              - //...
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+      - put: pull-request
+        params:
+          path: pull-request
+          status: success
